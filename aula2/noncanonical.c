@@ -64,7 +64,6 @@ int main(int argc, char** argv) {
   while (STOP == FALSE) {
     // returns after 5 chars have been input
     read(fd, buf, sizeof(buf));
-    printf("%d\n", sizeof(buf));
 
     printf("----------\n");
     printf("FLAG: %x\n", buf[0]);
@@ -107,6 +106,6 @@ int main(int argc, char** argv) {
 
   tcsetattr(fd, TCSANOW, &oldtio);
   close(fd);
-  
+
   return 0;
 }

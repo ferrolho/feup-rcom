@@ -16,6 +16,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define MODEMDEVICE "/dev/ttyS0"
 #define FALSE 0
 #define TRUE !FALSE
 #define BAUDRATE B38400
@@ -23,9 +24,9 @@
 #define A 0x03
 #define C 0x03
 
-enum State {
+typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
-};
+} State;
 
 int openSerialPort(char* serialPort) {
 	// Open serial port device for reading and writing and not as controlling
@@ -55,10 +56,10 @@ void setNewTermios(int fd, struct termios* newtio) {
 	newtio->c_lflag = 0;
 
 	// inter-character timer unused
-	newtio->c_cc[VTIME] = 0;
+	newtio->c_cc[VTIME] = 1;
 
 	// blocking read until 5 chars received
-	newtio->c_cc[VMIN] = 5;
+	newtio->c_cc[VMIN] = 0;
 
 	tcflush(fd, TCIOFLUSH);
 	if (tcsetattr(fd, TCSANOW, newtio) == -1) {
@@ -72,39 +73,62 @@ void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, str
 	setNewTermios(fd, newtio);
 }
 
-volatile int done = FALSE;
-
-void receiveSet(int fd, unsigned char* buf, unsigned int size) {
+void receiveSET(int fd, unsigned char* buf, unsigned int size) {
 	printf("Receiving SET... ");
 
+	State state = START;
+	
+	volatile int done = FALSE;
 	while (!done) {
-		read(fd, buf, size * sizeof(*buf));
+		unsigned char c;
+		read(fd, &c, 1);
 
-	    // verification
-		if (buf[0] != FLAG)
-			printf("Flag error\n");
-		else
+		switch (state) {
+		case START:
+			if (c == FLAG) {
+				buf[START] = c;
+				state = FLAG_RCV;
+			}
+			break;
+		case FLAG_RCV:
+			if (c == A) {
+				buf[FLAG_RCV] = c;
+				state = A_RCV;
+			} else if (c != FLAG)
+				state = START;
+			break;
+		case A_RCV:
+			if (c == C) {
+				buf[A_RCV] = c;
+				state = C_RCV;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case C_RCV:
+			if (c == (A ^ C)) {
+				buf[C_RCV] = c;
+				state = BCC_OK;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case BCC_OK:
+			if (c == FLAG) {
+				buf[BCC_OK] = c;
+				state = STOP;
+			} else
+				state = START;
+			break;
+		case STOP:
+			buf[STOP] = 0;
 			done = TRUE;
-
-		if (buf[1] != A)
-			printf("A error\n");
-		else
-			done = TRUE;
-
-		if (buf[2] != C)
-			printf("C error\n");
-		else
-			done = TRUE;
-
-		if (buf[3] != (buf[1] ^ buf[2]))
-			printf("XOR error: %x != %x\n", buf[3], buf[1] ^ buf[2]);
-		else
-			done = TRUE;
-
-		if (buf[4] != FLAG)
-			printf("Flag error\n");
-		else
-			done = TRUE;
+			break;
+		default:
+			break;
+		}
 	}
 
 	printf("OK!\n");
@@ -127,8 +151,8 @@ void sendUA(int fd, unsigned char* buf, unsigned int size) {
 }
 
 int main(int argc, char** argv) {
-	if (argc < 2 || strcmp("/dev/ttyS0", argv[1]) != 0) {
-		printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS0\n");
+	if (argc < 2 || strcmp(MODEMDEVICE, argv[1]) != 0) {
+		printf("Usage:\tnserial SerialPort\n\tex: nserial %s\n", MODEMDEVICE);
 		exit(1);
 	}
 
@@ -140,10 +164,13 @@ int main(int argc, char** argv) {
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
 
-	receiveSet(fd, buf, bufSize);
+	receiveSET(fd, buf, bufSize);
 	sendUA(fd, buf, bufSize);
 
-	tcsetattr(fd, TCSANOW, &oldtio);
+	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+		perror("tcsetattr");
+		exit(-1);
+	}
 	close(fd);
 
 	return 0;

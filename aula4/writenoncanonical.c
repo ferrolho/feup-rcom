@@ -17,6 +17,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define MODEMDEVICE "/dev/ttyS4"
 #define FALSE 0
 #define TRUE !FALSE
 #define BAUDRATE B38400
@@ -24,9 +25,9 @@
 #define A 0x03
 #define C 0x03
 
-enum State {
+typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
-};
+} State;
 
 int openSerialPort(char* serialPort) {
 	// Open serial port device for reading and writing and not as controlling
@@ -56,10 +57,10 @@ void setNewTermios(int fd, struct termios* newtio) {
 	newtio->c_lflag = 0;
 
 	// inter-character timer unused
-	newtio->c_cc[VTIME] = 0;
+	newtio->c_cc[VTIME] = 30;
 
-	// blocking read until 5 chars received
-	newtio->c_cc[VMIN] = 5;
+	// blocking read until x chars received
+	newtio->c_cc[VMIN] = 0;
 
 	tcflush(fd, TCIOFLUSH);
 	if (tcsetattr(fd, TCSANOW, newtio) == -1) {
@@ -73,22 +74,67 @@ void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, str
 	setNewTermios(fd, newtio);
 }
 
-volatile int done = FALSE;
+void printBuf(unsigned char* buf) {
+	printf("-----------------\n");
+	printf("- FLAG: %x\t-\n", buf[0]);
+	printf("- A: %x\t\t-\n", buf[1]);
+	printf("- C: %x\t\t-\n", buf[2]);
+	printf("- BCC: %x = %x\t-\n", buf[3], buf[1] ^ buf[2]);
+	printf("- FLAG: %x\t-\n", buf[4]);
+	printf("-----------------\n");
+}
 
-int state = 0;
-int flag = 1, conta = 1;
+void cleanBuf(unsigned char* buf, unsigned int bufSize) {
+	memset(buf, 0, bufSize * sizeof(*buf));
+}
 
-void handler() {
-	printf("tentativa %d: timed out!\n", conta);
-	flag = 1;
-	done = TRUE;
-	conta++;
-	state = 0;
+void createSETBuf(unsigned char* buf, unsigned int bufSize) {
+	cleanBuf(buf, bufSize);
+
+	buf[0] = FLAG;
+	buf[1] = A;
+	buf[2] = C;
+	buf[3] = buf[1] ^ buf[2];
+	buf[4] = FLAG;
+}
+
+void sendSET(int fd, unsigned char* buf, unsigned int bufSize) {
+	createSETBuf(buf, bufSize);
+
+	printf("Sending SET... ");
+	
+	write(fd, buf, bufSize * sizeof(*buf));
+
+	printf("OK!\n");
+}
+
+void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
+	int try, numTries = 3;
+
+	for (try = 0; try < numTries; try++) {
+		sendSET(fd, buf, bufSize);
+
+		printf("Waiting for UA... ");
+		int numReadBytes = read(fd, buf, bufSize * sizeof(*buf));
+
+		if (numReadBytes == 0) {
+			if (try == numTries - 1)
+				printf("Connection aborted.\n");
+			else
+				printf("Time out!\nRetrying: ");
+		} else {
+			printf("OK!\n");
+
+			printBuf(buf);
+
+			break;
+		}
+	}
 }
 
 int main(int argc, char** argv) {
-	if (argc < 2 || strcmp("/dev/ttyS4", argv[1]) != 0) {
-		printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS4\n");
+	if (argc < 2 || strcmp(MODEMDEVICE, argv[1]) != 0) {
+		printf("Usage:\tnserial SerialPort\n\tex: nserial %s\n", MODEMDEVICE);
 		exit(1);
 	}
 
@@ -99,136 +145,13 @@ int main(int argc, char** argv) {
 
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
-	buf[0] = FLAG;
-	buf[1] = A;
-	buf[2] = C;
-	buf[3] = buf[1] ^ buf[2];
-	buf[4] = FLAG;
+	sendSETAndReceiveUA(fd, buf, bufSize);
 
-	signal(SIGALRM, handler);
-
-	unsigned char UA[5];
-	unsigned int uaByteBeingRead = 0;
-
-	while (conta < 4 && !done) {
-		if(flag) {
-			int res;
-			flag = 0;
-			res = write(fd, buf, sizeof(buf));
-			printf("%d bytes written\n", res);
-
-			alarm(3);
-			unsigned char byte;
-			res = read(fd, &byte, 1);
-			printf("res: %d\n", res);
-
-			switch(state) {
-
-				case 0:
-				if (byte == FLAG) {
-					printf("byte received : %c\n", byte);
-					UA[uaByteBeingRead++] = byte;
-					state = 1;
-					flag = 1;
-				}			
-				else { 
-					uaByteBeingRead = 0;
-					UA[uaByteBeingRead] = 0;
-					state = 0;
-					printf("Flag error\n");
-					done = TRUE;
-				}
-				break;
-
-				case 1:
-				if (byte == A) {
-					printf("byte received : %c\n", byte);
-					UA[uaByteBeingRead++] = byte;
-					state = 2;
-					flag = 1;
-				}			
-				else { 
-					uaByteBeingRead = 0;
-					UA[uaByteBeingRead] = 0;
-					state = 0;
-					printf("A error\n");
-					done = TRUE;
-				}
-				break;
-
-				case 2:
-				if (byte == C) {
-					printf("byte received : %c\n", byte);
-					UA[uaByteBeingRead++] = byte;
-					state = 3;
-					flag = 1;
-				}			
-				else { 
-					uaByteBeingRead = 0;
-					UA[uaByteBeingRead] = 0;
-					state = 0;
-					printf("C error\n");
-					done = TRUE;
-				}
-				break;
-
-				case 3:
-				if (byte == (A ^ C)) {
-					printf("byte received : %c\n", byte);
-					UA[uaByteBeingRead++] = byte;
-					state = 4;
-					flag = 1;
-				}			
-
-				else { 
-					uaByteBeingRead = 0;
-					UA[uaByteBeingRead] = 0;
-					printf("XOR error: %x != %x\n", UA[3], UA[1] ^ UA[2]);
-					done = TRUE;
-				}
-				break;
-
-				case 4:
-				if (byte == FLAG) {
-					printf("byte received : %c\n", byte);
-					UA[uaByteBeingRead++] = byte;
-					flag = 1;
-					done = TRUE;
-				}			
-
-				else { 
-					uaByteBeingRead = 0;
-					UA[uaByteBeingRead] = 0;
-					state = 0;
-					printf("Flag error\n");
-					done = TRUE;
-				}
-				break;
-			}
-		}
-	}
-
-	
-	if (conta >= 4) {
-		printf("Connection aborted!\n");
-		exit(-1);
-	}
-
-
-	if (UA[0] != FLAG || UA[1] != A || UA[2] != C || UA[3] != (UA[1] ^ UA[2]) || UA[4] != FLAG) {
-		printf("UA error\n");
-		exit(-1);
-	}
-	else
-		printf("UA received successfully!!!! \n");
-	
-
-	// Reconfiguração da porta de série
-	if (tcsetattr(fd,TCSANOW,&oldtio) == -1) {
+	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
 		perror("tcsetattr");
 		exit(-1);
 	}
-
 	close(fd);
+
 	return 0;
 }

@@ -74,13 +74,13 @@ void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, str
 }
 
 void printBuf(unsigned char* buf) {
-	printf("-----------------\n");
-	printf("- FLAG: %x\t-\n", buf[0]);
-	printf("- A: %x\t\t-\n", buf[1]);
-	printf("- C: %x\t\t-\n", buf[2]);
-	printf("- BCC: %x = %x\t-\n", buf[3], buf[1] ^ buf[2]);
-	printf("- FLAG: %x\t-\n", buf[4]);
-	printf("-----------------\n");
+	printf("-------------------------\n");
+	printf("- FLAG: 0x%02x\t\t-\n", buf[0]);
+	printf("- A: 0x%02x\t\t-\n", buf[1]);
+	printf("- C: 0x%02x\t\t-\n", buf[2]);
+	printf("- BCC: 0x%02x = 0x%02x\t-\n", buf[3], buf[1] ^ buf[2]);
+	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
+	printf("-------------------------\n");
 }
 
 void receiveSET(int fd, unsigned char* buf, unsigned int size) {

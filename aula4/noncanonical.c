@@ -73,6 +73,16 @@ void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, str
 	setNewTermios(fd, newtio);
 }
 
+void printBuf(unsigned char* buf) {
+	printf("-----------------\n");
+	printf("- FLAG: %x\t-\n", buf[0]);
+	printf("- A: %x\t\t-\n", buf[1]);
+	printf("- C: %x\t\t-\n", buf[2]);
+	printf("- BCC: %x = %x\t-\n", buf[3], buf[1] ^ buf[2]);
+	printf("- FLAG: %x\t-\n", buf[4]);
+	printf("-----------------\n");
+}
+
 void receiveSET(int fd, unsigned char* buf, unsigned int size) {
 	printf("Receiving SET... ");
 
@@ -81,7 +91,10 @@ void receiveSET(int fd, unsigned char* buf, unsigned int size) {
 	volatile int done = FALSE;
 	while (!done) {
 		unsigned char c;
-		read(fd, &c, 1);
+
+		if (state != STOP) {
+			read(fd, &c, 1);
+		}
 
 		switch (state) {
 		case START:
@@ -133,13 +146,7 @@ void receiveSET(int fd, unsigned char* buf, unsigned int size) {
 
 	printf("OK!\n");
 
-	printf("-----------------\n");
-	printf("- FLAG: %x\t-\n", buf[0]);
-	printf("- A: %x\t\t-\n", buf[1]);
-	printf("- C: %x\t\t-\n", buf[2]);
-	printf("- BCC: %x = %x\t-\n", buf[3], buf[1] ^ buf[2]);
-	printf("- FLAG: %x\t-\n", buf[4]);
-	printf("-----------------\n");
+	printBuf(buf);
 }
 
 void sendUA(int fd, unsigned char* buf, unsigned int size) {

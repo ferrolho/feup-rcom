@@ -8,7 +8,6 @@
 *
 */
 #include <fcntl.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,26 +107,103 @@ void sendSET(int fd, unsigned char* buf, unsigned int bufSize) {
 	printf("OK!\n");
 }
 
+
+// returns 1 on success
+int receiveUA(int fd, unsigned char* buf, unsigned int size) {
+	printf("Waiting for UA... ");
+
+	int numReadBytes;
+	State state = START;
+	int debugStateMachine = 0;
+	
+	volatile int done = FALSE;
+	while (!done) {
+		unsigned char c;
+
+		if (state != STOP) {
+			numReadBytes = read(fd, &c, 1);
+
+			if (!numReadBytes)
+				return 0;
+		}
+
+		switch (state) {
+		case START:
+			if (c == FLAG) {
+				if (debugStateMachine)
+					printf("START: FLAG received. Going to FLAG_RCV.\n");
+				buf[START] = c;
+				state = FLAG_RCV;
+			}
+			break;
+		case FLAG_RCV:
+			if (c == A) {
+				if (debugStateMachine)
+					printf("FLAG_RCV: A received. Going to A_RCV.\n");
+				buf[FLAG_RCV] = c;
+				state = A_RCV;
+			} else if (c != FLAG)
+				state = START;
+			break;
+		case A_RCV:
+			if (c == C) {
+				if (debugStateMachine)
+					printf("A_RCV: C received. Going to C_RCV.\n");
+				buf[A_RCV] = c;
+				state = C_RCV;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case C_RCV:
+			if (c == (A ^ C)) {
+				if (debugStateMachine)
+					printf("C_RCV: BCC received. Going to BCC_OK.\n");
+				buf[C_RCV] = c;
+				state = BCC_OK;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case BCC_OK:
+			if (c == FLAG) {
+				if (debugStateMachine)
+					printf("BCC_OK: FLAG received. Going to STOP.\n");
+				buf[BCC_OK] = c;
+				state = STOP;
+			} else
+				state = START;
+			break;
+		case STOP:
+			buf[STOP] = 0;
+			done = TRUE;
+			break;
+		default:
+			break;
+		}
+	}
+
+	printf("OK!\n");
+
+	return 1;
+}
+
 void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
-	int try, numTries = 3;
+	int try, numTries = 4;
 
 	for (try = 0; try < numTries; try++) {
 		sendSET(fd, buf, bufSize);
 
-		printf("Waiting for UA... ");
-		int numReadBytes = read(fd, buf, bufSize * sizeof(*buf));
-
-		if (numReadBytes == 0) {
+		if (receiveUA(fd, buf, bufSize)) {
+			printBuf(buf);
+			break;
+		} else {
 			if (try == numTries - 1)
 				printf("Connection aborted.\n");
 			else
-				printf("Time out!\nRetrying: ");
-		} else {
-			printf("OK!\n");
-
-			printBuf(buf);
-
-			break;
+				printf("Time out!\n\nRetrying: ");
 		}
 	}
 }

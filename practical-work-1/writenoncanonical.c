@@ -74,13 +74,13 @@ void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, str
 }
 
 void printBuf(unsigned char* buf) {
-	printf("-----------------\n");
-	printf("- FLAG: %x\t-\n", buf[0]);
-	printf("- A: %x\t\t-\n", buf[1]);
-	printf("- C: %x\t\t-\n", buf[2]);
-	printf("- BCC: %x = %x\t-\n", buf[3], buf[1] ^ buf[2]);
-	printf("- FLAG: %x\t-\n", buf[4]);
-	printf("-----------------\n");
+	printf("-------------------------\n");
+	printf("- FLAG: 0x%02x\t\t-\n", buf[0]);
+	printf("- A: 0x%02x\t\t-\n", buf[1]);
+	printf("- C: 0x%02x\t\t-\n", buf[2]);
+	printf("- BCC: 0x%02x = 0x%02x\t-\n", buf[3], buf[1] ^ buf[2]);
+	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
+	printf("-------------------------\n");
 }
 
 void cleanBuf(unsigned char* buf, unsigned int bufSize) {
@@ -107,6 +107,7 @@ void sendSET(int fd, unsigned char* buf, unsigned int bufSize) {
 	printf("OK!\n");
 }
 
+const int DEBUG_STATE_MACHINE = 0;
 
 // returns 1 on success
 int receiveUA(int fd, unsigned char* buf, unsigned int size) {
@@ -114,7 +115,6 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 
 	int numReadBytes;
 	State state = START;
-	int debugStateMachine = 0;
 	
 	volatile int done = FALSE;
 	while (!done) {
@@ -123,6 +123,12 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 		if (state != STOP) {
 			numReadBytes = read(fd, &c, 1);
 
+			if (DEBUG_STATE_MACHINE) {
+				printf("Number of bytes read: %d\n", numReadBytes);
+				if (numReadBytes)
+					printf("Read char: 0x%02x\n", c);
+			}
+
 			if (!numReadBytes)
 				return 0;
 		}
@@ -130,7 +136,7 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 		switch (state) {
 		case START:
 			if (c == FLAG) {
-				if (debugStateMachine)
+				if (DEBUG_STATE_MACHINE)
 					printf("START: FLAG received. Going to FLAG_RCV.\n");
 				buf[START] = c;
 				state = FLAG_RCV;
@@ -138,7 +144,7 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 			break;
 		case FLAG_RCV:
 			if (c == A) {
-				if (debugStateMachine)
+				if (DEBUG_STATE_MACHINE)
 					printf("FLAG_RCV: A received. Going to A_RCV.\n");
 				buf[FLAG_RCV] = c;
 				state = A_RCV;
@@ -147,7 +153,7 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 			break;
 		case A_RCV:
 			if (c == C) {
-				if (debugStateMachine)
+				if (DEBUG_STATE_MACHINE)
 					printf("A_RCV: C received. Going to C_RCV.\n");
 				buf[A_RCV] = c;
 				state = C_RCV;
@@ -158,7 +164,7 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 			break;
 		case C_RCV:
 			if (c == (A ^ C)) {
-				if (debugStateMachine)
+				if (DEBUG_STATE_MACHINE)
 					printf("C_RCV: BCC received. Going to BCC_OK.\n");
 				buf[C_RCV] = c;
 				state = BCC_OK;
@@ -169,7 +175,7 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 			break;
 		case BCC_OK:
 			if (c == FLAG) {
-				if (debugStateMachine)
+				if (DEBUG_STATE_MACHINE)
 					printf("BCC_OK: FLAG received. Going to STOP.\n");
 				buf[BCC_OK] = c;
 				state = STOP;

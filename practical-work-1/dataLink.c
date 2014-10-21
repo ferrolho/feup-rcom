@@ -1,5 +1,5 @@
 /*
-* Non-Canonical Input Processing
+* FEUP - RCOM
 *
 * Authors:
 *  Henrique Ferrolho
@@ -7,13 +7,14 @@
 *  Miguel Ribeiro
 *
 */
+#include "dataLink.h"
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <termios.h>
 #include <unistd.h>
 
 #define MODEMDEVICE "/dev/ttyS4"
@@ -214,13 +215,13 @@ void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
 	}
 }
 
-int main(int argc, char** argv) {
-	if (argc < 2 || strcmp(MODEMDEVICE, argv[1]) != 0) {
+int sender(char* port) {
+	if (strcmp(MODEMDEVICE, port) != 0) {
 		printf("Usage:\tnserial SerialPort\n\tex: nserial %s\n", MODEMDEVICE);
 		exit(1);
 	}
 
-	int fd = openSerialPort(argv[1]);
+	int fd = openSerialPort(port);
 
 	struct termios oldtio, newtio;
 	saveCurrentPortSettingsAndSetNewTermios(fd, &oldtio, &newtio);

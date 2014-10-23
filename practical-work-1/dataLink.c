@@ -17,7 +17,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define MODEMDEVICE "/dev/ttyS4"
 #define FALSE 0
 #define TRUE !FALSE
 #define BAUDRATE B38400
@@ -28,6 +27,57 @@
 typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
 } State;
+
+int openSerialPort(char* serialPort);
+void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, struct termios* newtio);
+void saveCurrentPortSettings(int fd, struct termios* oldtio);
+void setNewTermios(int fd, struct termios* newtio);
+void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize);
+void sendSET(int fd, unsigned char* buf, unsigned int bufSize);
+int receiveUA(int fd, unsigned char* buf, unsigned int size);
+void createSETBuf(unsigned char* buf, unsigned int bufSize);
+void cleanBuf(unsigned char* buf, unsigned int bufSize);
+void printBuf(unsigned char* buf);
+
+int sender(char* port) {
+	int fd = openSerialPort(port);
+
+	struct termios oldtio, newtio;
+	saveCurrentPortSettingsAndSetNewTermios(fd, &oldtio, &newtio);
+
+	unsigned int bufSize = 5;
+	unsigned char buf[bufSize];
+	sendSETAndReceiveUA(fd, buf, bufSize);
+
+	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+		perror("tcsetattr");
+		exit(-1);
+	}
+	close(fd);
+
+	return 0;
+}
+
+int receiver(char* port) {
+	int fd = openSerialPort(port);
+
+	struct termios oldtio, newtio;
+	saveCurrentPortSettingsAndSetNewTermios(fd, &oldtio, &newtio);
+
+	unsigned int bufSize = 5;
+	unsigned char buf[bufSize];
+
+	receiveSET(fd, buf, bufSize);
+	sendUA(fd, buf, bufSize);
+
+	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+		perror("tcsetattr");
+		exit(-1);
+	}
+	close(fd);
+
+	return 0;
+}
 
 int openSerialPort(char* serialPort) {
 	// Open serial port device for reading and writing and not as controlling
@@ -40,6 +90,11 @@ int openSerialPort(char* serialPort) {
 	}
 
 	return fd;
+}
+
+void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, struct termios* newtio) {
+	saveCurrentPortSettings(fd, oldtio);
+	setNewTermios(fd, newtio);
 }
 
 void saveCurrentPortSettings(int fd, struct termios* oldtio) {
@@ -69,33 +124,22 @@ void setNewTermios(int fd, struct termios* newtio) {
 	} else printf("New termios structure set.\n");
 }
 
-void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, struct termios* newtio) {
-	saveCurrentPortSettings(fd, oldtio);
-	setNewTermios(fd, newtio);
-}
+void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
+	int try, numTries = 4;
 
-void printBuf(unsigned char* buf) {
-	printf("-------------------------\n");
-	printf("- FLAG: 0x%02x\t\t-\n", buf[0]);
-	printf("- A: 0x%02x\t\t-\n", buf[1]);
-	printf("- C: 0x%02x\t\t-\n", buf[2]);
-	printf("- BCC: 0x%02x = 0x%02x\t-\n", buf[3], buf[1] ^ buf[2]);
-	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
-	printf("-------------------------\n");
-}
+	for (try = 0; try < numTries; try++) {
+		sendSET(fd, buf, bufSize);
 
-void cleanBuf(unsigned char* buf, unsigned int bufSize) {
-	memset(buf, 0, bufSize * sizeof(*buf));
-}
-
-void createSETBuf(unsigned char* buf, unsigned int bufSize) {
-	cleanBuf(buf, bufSize);
-
-	buf[0] = FLAG;
-	buf[1] = A;
-	buf[2] = C;
-	buf[3] = buf[1] ^ buf[2];
-	buf[4] = FLAG;
+		if (receiveUA(fd, buf, bufSize)) {
+			printBuf(buf);
+			break;
+		} else {
+			if (try == numTries - 1)
+				printf("Connection aborted.\n");
+			else
+				printf("Time out!\n\nRetrying: ");
+		}
+	}
 }
 
 void sendSET(int fd, unsigned char* buf, unsigned int bufSize) {
@@ -197,44 +241,100 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 	return 1;
 }
 
-void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
-	int try, numTries = 4;
+void receiveSET(int fd, unsigned char* buf, unsigned int size) {
+	printf("Receiving SET... ");
 
-	for (try = 0; try < numTries; try++) {
-		sendSET(fd, buf, bufSize);
+	State state = START;
+	
+	volatile int done = FALSE;
+	while (!done) {
+		unsigned char c;
 
-		if (receiveUA(fd, buf, bufSize)) {
-			printBuf(buf);
+		if (state != STOP) {
+			read(fd, &c, 1);
+		}
+
+		switch (state) {
+		case START:
+			if (c == FLAG) {
+				buf[START] = c;
+				state = FLAG_RCV;
+			}
 			break;
-		} else {
-			if (try == numTries - 1)
-				printf("Connection aborted.\n");
+		case FLAG_RCV:
+			if (c == A) {
+				buf[FLAG_RCV] = c;
+				state = A_RCV;
+			} else if (c != FLAG)
+				state = START;
+			break;
+		case A_RCV:
+			if (c == C) {
+				buf[A_RCV] = c;
+				state = C_RCV;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
 			else
-				printf("Time out!\n\nRetrying: ");
+				state = START;
+			break;
+		case C_RCV:
+			if (c == (A ^ C)) {
+				buf[C_RCV] = c;
+				state = BCC_OK;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case BCC_OK:
+			if (c == FLAG) {
+				buf[BCC_OK] = c;
+				state = STOP;
+			} else
+				state = START;
+			break;
+		case STOP:
+			buf[STOP] = 0;
+			done = TRUE;
+			break;
+		default:
+			break;
 		}
 	}
+
+	printf("OK!\n");
+
+	printBuf(buf);
 }
 
-int sender(char* port) {
-	if (strcmp(MODEMDEVICE, port) != 0) {
-		printf("Usage:\tnserial SerialPort\n\tex: nserial %s\n", MODEMDEVICE);
-		exit(1);
-	}
+void sendUA(int fd, unsigned char* buf, unsigned int size) {
+	printf("Sending UA... ");
 
-	int fd = openSerialPort(port);
+	write(fd, buf, size * sizeof(*buf));
 
-	struct termios oldtio, newtio;
-	saveCurrentPortSettingsAndSetNewTermios(fd, &oldtio, &newtio);
+	printf("OK!\n");
+}
 
-	unsigned int bufSize = 5;
-	unsigned char buf[bufSize];
-	sendSETAndReceiveUA(fd, buf, bufSize);
+void createSETBuf(unsigned char* buf, unsigned int bufSize) {
+	cleanBuf(buf, bufSize);
 
-	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
-		perror("tcsetattr");
-		exit(-1);
-	}
-	close(fd);
+	buf[0] = FLAG;
+	buf[1] = A;
+	buf[2] = C;
+	buf[3] = buf[1] ^ buf[2];
+	buf[4] = FLAG;
+}
 
-	return 0;
+void cleanBuf(unsigned char* buf, unsigned int bufSize) {
+	memset(buf, 0, bufSize * sizeof(*buf));
+}
+
+void printBuf(unsigned char* buf) {
+	printf("-------------------------\n");
+	printf("- FLAG: 0x%02x\t\t-\n", buf[0]);
+	printf("- A: 0x%02x\t\t-\n", buf[1]);
+	printf("- C: 0x%02x\t\t-\n", buf[2]);
+	printf("- BCC: 0x%02x = 0x%02x\t-\n", buf[3], buf[1] ^ buf[2]);
+	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
+	printf("-------------------------\n");
 }

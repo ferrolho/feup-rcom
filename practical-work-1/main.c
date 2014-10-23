@@ -50,7 +50,7 @@ static int procArgs(int argc, char** argv) {
 		sender(port);
 		break;
 	case RECEIVE:
-		// call receiver function here
+		receiver(port);
 		break;
 	default:
 		break;

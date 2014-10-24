@@ -12,11 +12,8 @@ void saveCurrentPortSettings(int fd, struct termios* oldtio);
 void setNewTermios(int fd, struct termios* newtio);
 
 void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize);
-void sendSET(int fd, unsigned char* buf, unsigned int bufSize);
-int receiveUA(int fd, unsigned char* buf, unsigned int size);
-
-void receiveSET(int fd, unsigned char* buf, unsigned int size);
-void sendUA(int fd, unsigned char* buf, unsigned int size);
+void send(int fd, unsigned char* buf, unsigned int bufSize);
+int receive(int fd, unsigned char* buf, unsigned int bufSize);
 
 void createSETBuf(unsigned char* buf, unsigned int bufSize);
 void cleanBuf(unsigned char* buf, unsigned int bufSize);

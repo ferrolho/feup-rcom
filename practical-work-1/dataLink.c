@@ -28,17 +28,6 @@ typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
 } State;
 
-int openSerialPort(char* serialPort);
-void saveCurrentPortSettingsAndSetNewTermios(int fd, struct termios* oldtio, struct termios* newtio);
-void saveCurrentPortSettings(int fd, struct termios* oldtio);
-void setNewTermios(int fd, struct termios* newtio);
-void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize);
-void sendSET(int fd, unsigned char* buf, unsigned int bufSize);
-int receiveUA(int fd, unsigned char* buf, unsigned int size);
-void createSETBuf(unsigned char* buf, unsigned int bufSize);
-void cleanBuf(unsigned char* buf, unsigned int bufSize);
-void printBuf(unsigned char* buf);
-
 int sender(char* port) {
 	int fd = openSerialPort(port);
 
@@ -67,8 +56,8 @@ int receiver(char* port) {
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
 
-	receiveSET(fd, buf, bufSize);
-	sendUA(fd, buf, bufSize);
+	receive(fd, buf, bufSize);
+	send(fd, buf, bufSize);
 
 	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
 		perror("tcsetattr");
@@ -128,9 +117,10 @@ void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
 	int try, numTries = 4;
 
 	for (try = 0; try < numTries; try++) {
-		sendSET(fd, buf, bufSize);
+		createSETBuf(buf, bufSize);
+		send(fd, buf, bufSize);
 
-		if (receiveUA(fd, buf, bufSize)) {
+		if (receive(fd, buf, bufSize)) {
 			printBuf(buf);
 			break;
 		} else {
@@ -142,10 +132,8 @@ void sendSETAndReceiveUA(int fd, unsigned char* buf, unsigned int bufSize) {
 	}
 }
 
-void sendSET(int fd, unsigned char* buf, unsigned int bufSize) {
-	createSETBuf(buf, bufSize);
-
-	printf("Sending SET... ");
+void send(int fd, unsigned char* buf, unsigned int bufSize) {
+	printf("Sending to serial port... ");
 	
 	write(fd, buf, bufSize * sizeof(*buf));
 
@@ -155,8 +143,8 @@ void sendSET(int fd, unsigned char* buf, unsigned int bufSize) {
 const int DEBUG_STATE_MACHINE = 0;
 
 // returns 1 on success
-int receiveUA(int fd, unsigned char* buf, unsigned int size) {
-	printf("Waiting for UA... ");
+int receive(int fd, unsigned char* buf, unsigned int bufSize) {
+	printf("Reading from serial port... ");
 
 	int numReadBytes;
 	State state = START;
@@ -239,80 +227,6 @@ int receiveUA(int fd, unsigned char* buf, unsigned int size) {
 	printf("OK!\n");
 
 	return 1;
-}
-
-void receiveSET(int fd, unsigned char* buf, unsigned int size) {
-	printf("Receiving SET... ");
-
-	State state = START;
-	
-	volatile int done = FALSE;
-	while (!done) {
-		unsigned char c;
-
-		if (state != STOP) {
-			read(fd, &c, 1);
-		}
-
-		switch (state) {
-		case START:
-			if (c == FLAG) {
-				buf[START] = c;
-				state = FLAG_RCV;
-			}
-			break;
-		case FLAG_RCV:
-			if (c == A) {
-				buf[FLAG_RCV] = c;
-				state = A_RCV;
-			} else if (c != FLAG)
-				state = START;
-			break;
-		case A_RCV:
-			if (c == C) {
-				buf[A_RCV] = c;
-				state = C_RCV;
-			} else if (c == FLAG)
-				state = FLAG_RCV;
-			else
-				state = START;
-			break;
-		case C_RCV:
-			if (c == (A ^ C)) {
-				buf[C_RCV] = c;
-				state = BCC_OK;
-			} else if (c == FLAG)
-				state = FLAG_RCV;
-			else
-				state = START;
-			break;
-		case BCC_OK:
-			if (c == FLAG) {
-				buf[BCC_OK] = c;
-				state = STOP;
-			} else
-				state = START;
-			break;
-		case STOP:
-			buf[STOP] = 0;
-			done = TRUE;
-			break;
-		default:
-			break;
-		}
-	}
-
-	printf("OK!\n");
-
-	printBuf(buf);
-}
-
-void sendUA(int fd, unsigned char* buf, unsigned int size) {
-	printf("Sending UA... ");
-
-	write(fd, buf, size * sizeof(*buf));
-
-	printf("OK!\n");
 }
 
 void createSETBuf(unsigned char* buf, unsigned int bufSize) {

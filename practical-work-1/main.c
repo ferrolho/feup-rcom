@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "dataLink.h"
 
 typedef enum {
@@ -19,6 +20,8 @@ int main(int argc, char** argv) {
 	}
 
 	procArgs(argc, argv);
+
+	sleep(3);
 
 	return 0;
 }

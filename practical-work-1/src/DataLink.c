@@ -130,7 +130,7 @@ int llopen(const char* port, ConnnectionMode mode) {
 			} else {
 				if (try == numTries - 1) {
 					printf("Connection aborted.\n");
-					return 0;
+					return -1;
 				} else
 					printf("Time out!\n\nRetrying: ");
 			}
@@ -148,7 +148,7 @@ int llopen(const char* port, ConnnectionMode mode) {
 		break;
 	}
 
-	return 1;
+	return fd;
 }
 
 int send(int fd, unsigned char* buf, unsigned int bufSize) {

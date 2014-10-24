@@ -3,6 +3,30 @@
 #include <termios.h>
 #include "ConnectionMode.h"
 
+#define MAX_SIZE 256
+
+struct LinkLayer {
+	// device /dev/ttySx, x = 0, 1, ...
+	char port[20];
+
+	ConnnectionMode mode;
+
+	// transmission speed
+	int baudRate;
+
+	// frame sequence number (0, 1)
+	unsigned int sequenceNumber;
+
+	// timeout value
+	unsigned int timeout;
+
+	// number of retries in case of failure
+	unsigned int numTransmissions;
+
+	// trama
+	char frame[MAX_SIZE];
+};
+
 int dataLink(const char* port, ConnnectionMode mode);
 int openSerialPort(const char* port);
 

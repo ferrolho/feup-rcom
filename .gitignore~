@@ -27,13 +27,3 @@
 *.i*86
 *.x86_64
 *.hex
-
-# Custom
-bin
-Debug
-Default
-*.cproject
-*.project
-*.settings
-*.suppressed
-

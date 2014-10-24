@@ -120,7 +120,8 @@ int llopen(ConnnectionMode mode, int fd, unsigned char* buf,
 		break;
 	}
 	case RECEIVE: {
-		receive(fd, buf, bufSize);
+		if (!receive(fd, buf, bufSize))
+			printf("ERROR: nothing received.\n");
 		send(fd, buf, bufSize);
 		break;
 	}

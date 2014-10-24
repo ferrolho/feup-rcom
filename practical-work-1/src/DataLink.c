@@ -23,6 +23,7 @@
 #define FLAG 0x7E
 #define A 0x03
 #define C 0x03
+#define DISC 0x0B
 
 typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
@@ -34,7 +35,8 @@ int dataLink(const char* port, ConnnectionMode mode) {
 	struct termios oldtio, newtio;
 	saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio);
 
-	llopen(port, mode);
+	int portfd = llopen(port, mode);
+	int portclosefd = llclose(portfd, mode);
 
 	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
 		perror("tcsetattr");
@@ -149,6 +151,10 @@ int llopen(const char* port, ConnnectionMode mode) {
 	}
 
 	return fd;
+}
+
+int llclose(int fd, ConnnectionMode mode) {
+
 }
 
 int send(int fd, unsigned char* buf, unsigned int bufSize) {

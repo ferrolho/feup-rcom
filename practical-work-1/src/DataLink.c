@@ -121,7 +121,6 @@ int llopen(ConnnectionMode mode, int fd, unsigned char* buf,
 		for (try = 0; try < numTries; try++) {
 			createSETBuf(buf, bufSize);
 			send(fd, buf, bufSize);
-			printBuf(buf);
 
 			if (receive(fd, buf, bufSize)) {
 				printBuf(buf);

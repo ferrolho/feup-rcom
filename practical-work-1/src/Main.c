@@ -45,7 +45,7 @@ static int procArgs(int argc, char** argv) {
 
 	printArguments(mode, port, file);
 
-	init(port, mode);
+	dataLink(port, mode);
 
 	return 0;
 }

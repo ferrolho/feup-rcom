@@ -28,33 +28,31 @@ typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
 } State;
 
-int init(char* port, ConnnectionMode mode) {
+int dataLink(const char* port, ConnnectionMode mode) {
 	int fd = openSerialPort(port);
 
 	struct termios oldtio, newtio;
 	saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio);
 
-	unsigned int bufSize = 5;
-	unsigned char buf[bufSize];
-
-	llopen(mode, fd, buf, bufSize);
+	llopen(port, mode);
 
 	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
 		perror("tcsetattr");
 		exit(-1);
 	}
+
 	close(fd);
 
 	return 0;
 }
 
-int openSerialPort(char* serialPort) {
+int openSerialPort(const char* port) {
 	// Open serial port device for reading and writing and not as controlling
 	// tty because we don't want to get killed if linenoise sends CTRL-C.
-	int fd = open(serialPort, O_RDWR | O_NOCTTY);
+	int fd = open(port, O_RDWR | O_NOCTTY);
 
 	if (fd < 0) {
-		perror(serialPort);
+		perror(port);
 		exit(-1);
 	}
 
@@ -112,8 +110,12 @@ void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
 		printf("New termios structure set.\n");
 }
 
-int llopen(ConnnectionMode mode, int fd, unsigned char* buf,
-		unsigned int bufSize) {
+int llopen(const char* port, ConnnectionMode mode) {
+	int fd = openSerialPort(port);
+
+	unsigned int bufSize = 5;
+	unsigned char buf[bufSize];
+
 	switch (mode) {
 	case SEND: {
 		int try, numTries = 4;
@@ -164,7 +166,6 @@ int send(int fd, unsigned char* buf, unsigned int bufSize) {
 
 const int DEBUG_STATE_MACHINE = 0;
 
-// returns 1 on success
 int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 	printf("Reading from serial port.\n");
 

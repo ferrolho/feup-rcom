@@ -121,6 +121,7 @@ int llopen(ConnnectionMode mode, int fd, unsigned char* buf,
 		for (try = 0; try < numTries; try++) {
 			createSETBuf(buf, bufSize);
 			send(fd, buf, bufSize);
+			printBuf(buf);
 
 			if (receive(fd, buf, bufSize)) {
 				printBuf(buf);
@@ -138,6 +139,7 @@ int llopen(ConnnectionMode mode, int fd, unsigned char* buf,
 	}
 	case RECEIVE: {
 		receive(fd, buf, bufSize);
+		printBuf(buf);
 		send(fd, buf, bufSize);
 		break;
 	}
@@ -149,7 +151,7 @@ int llopen(ConnnectionMode mode, int fd, unsigned char* buf,
 }
 
 int send(int fd, unsigned char* buf, unsigned int bufSize) {
-	printf("Sending to serial port... ");
+	printf("Sending to serial port.\n");
 
 	if (write(fd, buf, bufSize * sizeof(*buf)) < 0) {
 		printf("ERROR: unable to write.\n");
@@ -165,7 +167,7 @@ const int DEBUG_STATE_MACHINE = 0;
 
 // returns 1 on success
 int receive(int fd, unsigned char* buf, unsigned int bufSize) {
-	printf("Reading from serial port... ");
+	printf("Reading from serial port.\n");
 
 	int numReadBytes;
 	State state = START;

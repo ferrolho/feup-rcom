@@ -34,13 +34,14 @@ typedef struct {
 	unsigned int timeout;
 
 	// number of retries in case of failure
-	unsigned int numTransmissions;
+	unsigned int numTries;
 
 	// trama
 	char frame[MAX_SIZE];
 } LinkLayer;
 
-int dataLink(const char* port, ConnnectionMode mode);
+int initLinkLayer(const char* port, ConnnectionMode mode);
+int startDataLink();
 
 int openSerialPort(const char* port);
 int closeSerialPort(int fd, struct termios* oldtio);
@@ -55,10 +56,9 @@ int llwrite();
 int llread();
 int llclose(int fd, ConnnectionMode mode);
 
-int send(int fd, unsigned char* buf, unsigned int bufSize);
-int receive(int fd, unsigned char* buf, unsigned int bufSize);
+int send(int fd, Command command);
+int receive(int fd, Command command);
 
 void createCommand(ControlField C, unsigned char* buf, unsigned int bufSize);
 void cleanBuf(unsigned char* buf, unsigned int bufSize);
 void printBuf(unsigned char* buf);
-void printDISC(unsigned char* buf);

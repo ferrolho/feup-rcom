@@ -11,26 +11,43 @@
 
 const int FALSE = 0;
 const int TRUE = 1;
+
 const int BAUDRATE = B38400;
 const int FLAG = 0x7E;
 const int A = 0x03;
-const int numTries = 4;
 
-int dataLink(const char* port, ConnnectionMode mode) {
-	int fd = openSerialPort(port);
+LinkLayer* ll;
+
+int initLinkLayer(const char* port, ConnnectionMode mode) {
+	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
+
+	strcpy(ll->port, port);
+	ll->mode = mode;
+	ll->baudRate = BAUDRATE;
+	ll->timeout = 3;
+	ll->numTries = 4;
+
+	startDataLink();
+
+	return 1;
+}
+
+int startDataLink() {
+	int fd = openSerialPort(ll->port);
 	if (fd < 0)
 		return 0;
 
 	struct termios oldtio, newtio;
-	if (!saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio))
+	if (!saveCurrentPortSettingsAndSetNewTermios(ll->mode, fd, &oldtio,
+			&newtio))
 		return 0;
 
-	int portfd = llopen(port, mode);
+	int portfd = llopen(ll->port, ll->mode);
 	if (portfd <= 0)
 		return 0;
 
-	int closeResult = llclose(portfd, mode);
-	printf("Result from llclose: %d\n", closeResult);
+	if (!llclose(portfd, ll->mode))
+		return 0;
 
 	if (!closeSerialPort(fd, &oldtio))
 		return 0;
@@ -99,14 +116,14 @@ int setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
 
 int alarmWentOff;
 
-void alarmHandler(int sig) {
-	if (sig != SIGALRM)
+void alarmHandler(int signal) {
+	if (signal != SIGALRM)
 		return;
 
 	alarmWentOff = 1;
-	printf("Alarm time out!\n\nRetrying:\n");
+	printf("Connection time out!\n\nRetrying:\n");
 
-	alarm(3);
+	alarm(ll->timeout);
 }
 
 void setAlarm() {
@@ -114,7 +131,7 @@ void setAlarm() {
 
 	alarmWentOff = 0;
 
-	alarm(3);
+	alarm(ll->timeout);
 }
 
 void stopAlarm() {
@@ -122,12 +139,11 @@ void stopAlarm() {
 }
 
 int llopen(const char* port, ConnnectionMode mode) {
+	printf("*** Trying to establish a connection. ***\n");
+
 	int fd = openSerialPort(port);
 	if (fd < 0)
 		return fd;
-
-	unsigned int bufSize = 5;
-	unsigned char buf[bufSize];
 
 	int try = 0, connected = 0;
 
@@ -137,26 +153,23 @@ int llopen(const char* port, ConnnectionMode mode) {
 			if (try == 0 || alarmWentOff) {
 				alarmWentOff = 0;
 
-				if (try >= numTries) {
+				if (try >= ll->numTries) {
 					stopAlarm();
 					printf("ERROR: Maximum number of retries exceeded.\n");
-					printf("Connection aborted.\n");
+					printf("*** Connection aborted. ***\n");
 					return 0;
 				}
 
-				createCommand(C_SET, buf, bufSize);
-				send(fd, buf, bufSize);
-				printf("Sent SET.\n");
+				send(fd, SET);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (receive(fd, buf, bufSize)) {
-				printBuf(buf);
-
+			if (receive(fd, UA)) {
 				connected = 1;
-				printf("Successfully received UA.\n");
+
+				printf("*** Successfully established a connection. ***\n");
 			}
 		}
 
@@ -166,14 +179,11 @@ int llopen(const char* port, ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		while (!connected) {
-			if (receive(fd, buf, bufSize)) {
-				printBuf(buf);
-
-				createCommand(C_UA, buf, bufSize);
-				send(fd, buf, bufSize);
-
+			if (receive(fd, SET)) {
+				send(fd, UA);
 				connected = 1;
-				printf("Successfully established a connection.\n");
+
+				printf("*** Successfully established a connection. ***\n");
 			}
 		}
 
@@ -195,8 +205,7 @@ int llread() {
 }
 
 int llclose(int fd, ConnnectionMode mode) {
-	unsigned int bufSize = 5;
-	unsigned char buf[bufSize];
+	printf("*** Terminating connection. ***\n");
 
 	int try = 0, disconnected = 0;
 
@@ -206,46 +215,35 @@ int llclose(int fd, ConnnectionMode mode) {
 			if (try == 0 || alarmWentOff) {
 				alarmWentOff = 0;
 
-				if (try >= numTries) {
+				if (try >= ll->numTries) {
 					stopAlarm();
 					printf("ERROR: Maximum number of retries exceeded.\n");
-					printf("Connection aborted.\n");
+					printf("*** Connection aborted. ***\n");
 					return 0;
 				}
 
-				createCommand(C_DISC, buf, bufSize);
-				send(fd, buf, bufSize);
+				send(fd, DISC);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (receive(fd, buf, bufSize)) {
-				printBuf(buf);
-
+			if (receive(fd, DISC))
 				disconnected = 1;
-				printf("Successfully received DISC.\n");
-			}
 		}
 
 		stopAlarm();
-
-		createCommand(C_UA, buf, bufSize);
-		send(fd, buf, bufSize);
-		printf("Successfully sent UA.\n");
-
+		send(fd, UA);
 		sleep(1);
+
+		printf("*** Connection terminated. ***\n");
 
 		return 1;
 	}
 	case RECEIVE: {
 		while (!disconnected) {
-			if (receive(fd, buf, bufSize)) {
-				printBuf(buf);
-				printf("Successfully received DISC.\n");
-
+			if (receive(fd, DISC))
 				disconnected = 1;
-			}
 		}
 
 		int uaReceived = 0;
@@ -253,28 +251,24 @@ int llclose(int fd, ConnnectionMode mode) {
 			if (try == 0 || alarmWentOff) {
 				alarmWentOff = 0;
 
-				if (try >= numTries) {
+				if (try >= ll->numTries) {
 					stopAlarm();
 					printf("ERROR: Disconnect could not be sent.\n");
 					return -1;
 				}
 
-				createCommand(C_DISC, buf, bufSize);
-				send(fd, buf, bufSize);
+				send(fd, DISC);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (receive(fd, buf, bufSize)) {
-				printBuf(buf);
-
+			if (receive(fd, UA))
 				uaReceived = 1;
-				printf("Successfully received UA.\n");
-			}
 		}
 
 		stopAlarm();
+		printf("*** Connection terminated. ***\n");
 
 		return 1;
 	}
@@ -285,25 +279,58 @@ int llclose(int fd, ConnnectionMode mode) {
 	return 0;
 }
 
-int send(int fd, unsigned char* buf, unsigned int bufSize) {
-	//printf("Sending to serial port.\n");
+int send(int fd, Command command) {
+	// TODO refactor this - pull up method
+	char commandStr[MAX_SIZE];
+	ControlField ctrlField;
 
-	if (write(fd, buf, bufSize * sizeof(*buf)) < 0) {
-		printf("ERROR: unable to write.\n");
+	switch (command) {
+	case SET:
+		strcpy(commandStr, "SET");
+		ctrlField = C_SET;
+		break;
+	case UA:
+		strcpy(commandStr, "UA");
+		ctrlField = C_UA;
+		break;
+	case RR:
+		strcpy(commandStr, "RR");
+		ctrlField = C_RR;
+		break;
+	case REJ:
+		strcpy(commandStr, "REJ");
+		ctrlField = C_REJ;
+		break;
+	case DISC:
+		strcpy(commandStr, "DISC");
+		ctrlField = C_DISC;
+		break;
+	default:
 		return 0;
 	}
 
-	//printf("OK!\n");
+	unsigned int bufSize = 5;
+	unsigned char buf[bufSize];
+	createCommand(ctrlField, buf, bufSize);
 
-	return 1;
+	if (write(fd, buf, bufSize * sizeof(*buf))) {
+		printf("SENT: %s\n", commandStr);
+		printBuf(buf);
+
+		return 1;
+	} else
+		printf("ERROR: Could not write %s command.\n", commandStr);
+
+	return 0;
 }
 
 const int DEBUG_STATE_MACHINE = 0;
 
-int receive(int fd, unsigned char* buf, unsigned int bufSize) {
-	//printf("Reading from serial port.\n");
+int receive(int fd, Command command) {
+	unsigned int bufSize = 5;
+	unsigned char buf[bufSize];
+	// cleanBuf(buf, bufSize);
 
-	int numReadBytes;
 	State state = START;
 
 	volatile int done = FALSE;
@@ -311,7 +338,7 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 		unsigned char c;
 
 		if (state != STOP) {
-			numReadBytes = read(fd, &c, 1);
+			int numReadBytes = read(fd, &c, 1);
 
 			if (DEBUG_STATE_MACHINE) {
 				printf("Number of bytes read: %d\n", numReadBytes);
@@ -320,7 +347,7 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 			}
 
 			if (!numReadBytes) {
-				//printf("ERROR: nothing received.\n");
+				// printf("ERROR: nothing received.\n");
 				return 0;
 			}
 		}
@@ -383,9 +410,44 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 		}
 	}
 
-	//printf("OK!\n");
+	// TODO refactor this - pull up method
+	char commandStr[MAX_SIZE];
+	ControlField ctrlField;
 
-	return 1;
+	switch (command) {
+	case SET:
+		strcpy(commandStr, "SET");
+		ctrlField = C_SET;
+		break;
+	case UA:
+		strcpy(commandStr, "UA");
+		ctrlField = C_UA;
+		break;
+	case RR:
+		strcpy(commandStr, "RR");
+		ctrlField = C_RR;
+		break;
+	case REJ:
+		strcpy(commandStr, "REJ");
+		ctrlField = C_REJ;
+		break;
+	case DISC:
+		strcpy(commandStr, "DISC");
+		ctrlField = C_DISC;
+		break;
+	default:
+		return 0;
+	}
+
+	if (buf[2] == ctrlField) {
+		printf("RECEIVED: %s.\n", commandStr);
+		printBuf(buf);
+
+		return 1;
+	} else
+		printf("ERROR: %s command was not received.\n", commandStr);
+
+	return 0;
 }
 
 void createCommand(ControlField C, unsigned char* buf, unsigned int bufSize) {
@@ -393,9 +455,7 @@ void createCommand(ControlField C, unsigned char* buf, unsigned int bufSize) {
 
 	buf[0] = FLAG;
 	buf[1] = A;
-
 	buf[2] = C;
-
 	buf[3] = buf[1] ^ buf[2];
 	buf[4] = FLAG;
 }
@@ -413,9 +473,3 @@ void printBuf(unsigned char* buf) {
 	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
 	printf("-------------------------\n");
 }
-void printDISC(unsigned char* buf) {
-	printf("-------------------------\n");
-	printf("- DISC: 0x%02x\t\t-\n", buf[0]);
-	printf("-------------------------\n");
-}
-

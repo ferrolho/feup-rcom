@@ -43,7 +43,7 @@ static int procArgs(int argc, char** argv) {
 
 	printArguments(mode, port, file);
 
-	dataLink(port, mode);
+	initLinkLayer(port, mode);
 
 	return 0;
 }

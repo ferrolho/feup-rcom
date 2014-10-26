@@ -28,8 +28,6 @@ int dataLink(const char* port, ConnnectionMode mode) {
 
 	int portfd = llopen(port, mode);
 
-	printf("\nStarting llclose\n");
-
 	int closeResult = llclose(portfd, mode);
 
 	printf("Result from llclose: %d\n", closeResult);
@@ -160,47 +158,43 @@ int llopen(const char* port, ConnnectionMode mode) {
 	return fd;
 }
 
-int llread() {
-	return 1;
-}
-
 int llwrite() {
 	return 1;
 }
 
+int llread() {
+	return 1;
+}
+
 int llclose(int fd, ConnnectionMode mode) {
-	int closeResult = -1;
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
 
 	switch (mode) {
 	case SEND: {
+		int try, numTries = 4;
 		buf[0] = DISC;
-		if (send(fd, buf, bufSize)) {
 
-			if (receiveDISC(fd, buf, bufSize)) {
-				printDISC(buf);
-				createSETBuf(buf, bufSize);
+		for (try = 0; try < numTries; try++) {
+			if (send(fd, buf, bufSize)) {
+				if (receiveDISC(fd, buf, bufSize)) {
+					printDISC(buf);
 
-				if (send(fd, buf, bufSize)) {
-					closeResult = close(fd);
-					printf("Serial Port is closed.\n");
-				} else {
-					printf("ERROR: UA was not sent.\n");
-					printf("       Cannot close serial port!\n");
-					closeResult = -1;
-				}
+					createSETBuf(buf, bufSize);
 
-			} else {
-				printf("ERROR: DISC was not received.\n");
-				closeResult = -1;
-			}
-
-		} else {
-			printf("ERROR: DISC was not sent.\n");
-			closeResult = -1;
+					if (send(fd, buf, bufSize)) {
+						close(fd);
+						printf("Serial port closed.\n");
+						return 1;
+					} else
+						printf("ERROR: UA was not sent.\n");
+				} else
+					printf("ERROR: DISC was not received.\n");
+			} else
+				printf("ERROR: DISC was not sent.\n");
 		}
-		break;
+
+		return 0;
 	}
 	case RECEIVE: {
 		bufSize = 1;
@@ -213,30 +207,22 @@ int llclose(int fd, ConnnectionMode mode) {
 
 				if (receive(fd, buf, bufSize)) {
 					printBuf(buf);
-					closeResult = close(fd);
-				} else {
+					close(fd);
+					return 1;
+				} else
 					printf("ERROR: UA was not received.\n");
-					printf("       Cannot close serial port!\n");
-					closeResult = -1;
-				}
-
-			} else {
+			} else
 				printf("ERROR: DISC was not sent.\n");
-				closeResult = -1;
-			}
-
-		} else {
+		} else
 			printf("ERROR: DISC was not received.\n");
-			closeResult = -1;
 
-		}
-		break;
+		return 0;
 	}
 	default:
 		break;
 	}
 
-	return closeResult;
+	return 0;
 }
 
 int send(int fd, unsigned char* buf, unsigned int bufSize) {
@@ -361,8 +347,7 @@ int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize) {
 	if (c == DISC) {
 		buf[0] = c;
 		return 1;
-	}
-	else
+	} else
 		return 0;
 }
 

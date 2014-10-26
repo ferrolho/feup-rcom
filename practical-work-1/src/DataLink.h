@@ -37,8 +37,8 @@ void saveCurrentPortSettings(int fd, struct termios* oldtio);
 void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio);
 
 int llopen(const char* port, ConnnectionMode mode);
-int llread();
 int llwrite();
+int llread();
 int llclose(int fd, ConnnectionMode mode);
 
 int send(int fd, unsigned char* buf, unsigned int bufSize);

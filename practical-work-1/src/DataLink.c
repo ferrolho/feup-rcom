@@ -1,12 +1,3 @@
-/*
- * FEUP - RCOM
- *
- * Authors:
- *  Henrique Ferrolho
- *  Joao Pereira
- *  Miguel Ribeiro
- *
- */
 #include "DataLink.h"
 
 #include <fcntl.h>
@@ -17,13 +8,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define FALSE 0
-#define TRUE !FALSE
-#define BAUDRATE B38400
-#define FLAG 0x7E
-#define A 0x03
-#define C 0x03
-#define DISC 0x0B
+const int FALSE = 0;
+const int TRUE = 1;
+const int BAUDRATE = B38400;
+const int FLAG = 0x7E;
+const int A = 0x03;
+const int C = 0x03;
+const int DISC = 0x0B;
 
 typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
@@ -114,6 +105,8 @@ void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
 
 int llopen(const char* port, ConnnectionMode mode) {
 	int fd = openSerialPort(port);
+	if (fd < 0)
+		return fd;
 
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
@@ -125,6 +118,9 @@ int llopen(const char* port, ConnnectionMode mode) {
 		for (try = 0; try < numTries; try++) {
 			createSETBuf(buf, bufSize);
 			send(fd, buf, bufSize);
+
+			// TODO work this out
+			// llread();
 
 			if (receive(fd, buf, bufSize)) {
 				printBuf(buf);
@@ -143,7 +139,13 @@ int llopen(const char* port, ConnnectionMode mode) {
 	case RECEIVE: {
 		receive(fd, buf, bufSize);
 		printBuf(buf);
+		// TODO work this out
+		// llwrite();
+
 		send(fd, buf, bufSize);
+		// TODO work this out
+		// llread();
+
 		break;
 	}
 	default:
@@ -153,8 +155,16 @@ int llopen(const char* port, ConnnectionMode mode) {
 	return fd;
 }
 
-int llclose(int fd, ConnnectionMode mode) {
+int llread() {
+	return 1;
+}
 
+int llwrite() {
+	return 1;
+}
+
+int llclose(int fd, ConnnectionMode mode) {
+	return 1;
 }
 
 int send(int fd, unsigned char* buf, unsigned int bufSize) {

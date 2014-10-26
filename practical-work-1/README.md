@@ -8,10 +8,10 @@ Open two other terminals and browse to the bin directory of the project where yo
 
 On one terminal run the following command to start **receiving** the file:
 ```
-sudo ./proj1 receive /dev/ttyS0 pinguim.gif
+sudo ./nserial receive /dev/ttyS0 pinguim.gif
 ```
 
 On the other terminal, run a similar command to start **transferring** the file:
 ```
-sudo ./proj1 send /dev/ttyS4 pinguim.gif
+sudo ./nserial send /dev/ttyS4 pinguim.gif
 ```

@@ -17,8 +17,6 @@ int main(int argc, char** argv) {
 
 	procArgs(argc, argv);
 
-	sleep(3);
-
 	return 0;
 }
 

@@ -1,6 +1,7 @@
 #include "DataLink.h"
 
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,97 +14,111 @@ const int TRUE = 1;
 const int BAUDRATE = B38400;
 const int FLAG = 0x7E;
 const int A = 0x03;
-const int C = 0x03;
-const int DISC = 0x0B;
-
-typedef enum {
-	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
-} State;
+const int numTries = 4;
 
 int dataLink(const char* port, ConnnectionMode mode) {
 	int fd = openSerialPort(port);
+	if (fd < 0)
+		return 0;
 
 	struct termios oldtio, newtio;
-	saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio);
+	if (!saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio))
+		return 0;
 
 	int portfd = llopen(port, mode);
+	if (portfd <= 0)
+		return 0;
 
 	int closeResult = llclose(portfd, mode);
-
 	printf("Result from llclose: %d\n", closeResult);
 
-	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
-		perror("tcsetattr");
-		exit(-1);
-	}
+	if (!closeSerialPort(fd, &oldtio))
+		return 0;
 
-	close(fd);
-
-	return 0;
+	return 1;
 }
 
 int openSerialPort(const char* port) {
 	// Open serial port device for reading and writing and not as controlling
 	// tty because we don't want to get killed if linenoise sends CTRL-C.
-	int fd = open(port, O_RDWR | O_NOCTTY);
-
-	if (fd < 0) {
-		perror(port);
-		exit(-1);
-	}
-
-	return fd;
+	return open(port, O_RDWR | O_NOCTTY);
 }
 
-void saveCurrentPortSettingsAndSetNewTermios(ConnnectionMode mode, int fd,
+int closeSerialPort(int fd, struct termios* oldtio) {
+	if (tcsetattr(fd, TCSANOW, oldtio) == -1) {
+		perror("tcsetattr");
+		return 0;
+	}
+
+	close(fd);
+
+	return 1;
+}
+
+int saveCurrentPortSettingsAndSetNewTermios(ConnnectionMode mode, int fd,
 		struct termios* oldtio, struct termios* newtio) {
-	saveCurrentPortSettings(fd, oldtio);
-	setNewTermios(mode, fd, newtio);
+	if (!saveCurrentPortSettings(fd, oldtio))
+		return 0;
+
+	if (!setNewTermios(mode, fd, newtio))
+		return 0;
+
+	return 1;
 }
 
-void saveCurrentPortSettings(int fd, struct termios* oldtio) {
-	if (tcgetattr(fd, oldtio) == -1) {
-		perror("tcgetattr");
-		exit(-1);
-	}
+int saveCurrentPortSettings(int fd, struct termios* oldtio) {
+	if (tcgetattr(fd, oldtio) != 0)
+		return 0;
+
+	return 1;
 }
 
-void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
+int setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
 	bzero(newtio, sizeof(*newtio));
 	newtio->c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
 	newtio->c_iflag = IGNPAR;
 	newtio->c_oflag = 0;
 	newtio->c_lflag = 0;
 
-	switch (mode) {
-	case SEND: {
-		// inter-character timer unused
-		newtio->c_cc[VTIME] = 30;
+	// inter-character timer unused
+	newtio->c_cc[VTIME] = 3;
 
-		// blocking read until x chars received
-		newtio->c_cc[VMIN] = 0;
+	// blocking read until x chars received
+	newtio->c_cc[VMIN] = 0;
 
-		break;
-	}
-	case RECEIVE: {
-		// inter-character timer unused
-		newtio->c_cc[VTIME] = 0;
+	if (tcflush(fd, TCIOFLUSH) != 0)
+		return 0;
 
-		// blocking read until x chars received
-		newtio->c_cc[VMIN] = 1;
+	if (tcsetattr(fd, TCSANOW, newtio) != 0)
+		return 0;
 
-		break;
-	}
-	default:
-		break;
-	}
+	printf("New termios structure set.\n");
 
-	tcflush(fd, TCIOFLUSH);
-	if (tcsetattr(fd, TCSANOW, newtio) == -1) {
-		perror("tcsetattr");
-		exit(-1);
-	} else
-		printf("New termios structure set.\n");
+	return 1;
+}
+
+int alarmWentOff;
+
+void alarmHandler(int sig) {
+	if (sig != SIGALRM)
+		return;
+
+	alarmWentOff = 1;
+	printf("Alarm time out!\n\nRetrying:\n");
+
+	alarm(3);
+}
+
+void setAlarm() {
+	signal(SIGALRM, alarmHandler);
+
+	alarmWentOff = 0;
+
+	alarm(3);
+}
+
+void stopAlarm() {
+	alarm(0);
 }
 
 int llopen(const char* port, ConnnectionMode mode) {
@@ -114,40 +129,53 @@ int llopen(const char* port, ConnnectionMode mode) {
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
 
+	int try = 0, connected = 0;
+
 	switch (mode) {
 	case SEND: {
-		int try, numTries = 4;
+		while (!connected) {
+			if (try == 0 || alarmWentOff) {
+				alarmWentOff = 0;
 
-		for (try = 0; try < numTries; try++) {
-			createSETBuf(buf, bufSize);
-			send(fd, buf, bufSize);
+				if (try >= numTries) {
+					stopAlarm();
+					printf("ERROR: Maximum number of retries exceeded.\n");
+					printf("Connection aborted.\n");
+					return 0;
+				}
 
-			// TODO work this out
-			// llread();
+				createCommand(C_SET, buf, bufSize);
+				send(fd, buf, bufSize);
+				printf("Sent SET.\n");
+
+				if (++try == 1)
+					setAlarm();
+			}
 
 			if (receive(fd, buf, bufSize)) {
 				printBuf(buf);
-				break;
-			} else {
-				if (try == numTries - 1) {
-					printf("Connection aborted.\n");
-					return -1;
-				} else
-					printf("Time out!\n\nRetrying: ");
+
+				connected = 1;
+				printf("Successfully received UA.\n");
 			}
 		}
+
+		stopAlarm();
 
 		break;
 	}
 	case RECEIVE: {
-		receive(fd, buf, bufSize);
-		printBuf(buf);
-		// TODO work this out
-		// llwrite();
+		while (!connected) {
+			if (receive(fd, buf, bufSize)) {
+				printBuf(buf);
 
-		send(fd, buf, bufSize);
-		// TODO work this out
-		// llread();
+				createCommand(C_UA, buf, bufSize);
+				send(fd, buf, bufSize);
+
+				connected = 1;
+				printf("Successfully established a connection.\n");
+			}
+		}
 
 		break;
 	}
@@ -170,53 +198,85 @@ int llclose(int fd, ConnnectionMode mode) {
 	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
 
+	int try = 0, disconnected = 0;
+
 	switch (mode) {
 	case SEND: {
-		int try, numTries = 4;
-		buf[0] = DISC;
+		while (!disconnected) {
+			if (try == 0 || alarmWentOff) {
+				alarmWentOff = 0;
 
-		for (try = 0; try < numTries; try++) {
-			if (send(fd, buf, bufSize)) {
-				if (receiveDISC(fd, buf, bufSize)) {
-					printDISC(buf);
+				if (try >= numTries) {
+					stopAlarm();
+					printf("ERROR: Maximum number of retries exceeded.\n");
+					printf("Connection aborted.\n");
+					return 0;
+				}
 
-					createSETBuf(buf, bufSize);
+				createCommand(C_DISC, buf, bufSize);
+				send(fd, buf, bufSize);
 
-					if (send(fd, buf, bufSize)) {
-						close(fd);
-						printf("Serial port closed.\n");
-						return 1;
-					} else
-						printf("ERROR: UA was not sent.\n");
-				} else
-					printf("ERROR: DISC was not received.\n");
-			} else
-				printf("ERROR: DISC was not sent.\n");
+				if (++try == 1)
+					setAlarm();
+			}
+
+			if (receive(fd, buf, bufSize)) {
+				printBuf(buf);
+
+				disconnected = 1;
+				printf("Successfully received DISC.\n");
+			}
 		}
 
-		return 0;
+		stopAlarm();
+
+		createCommand(C_UA, buf, bufSize);
+		send(fd, buf, bufSize);
+		printf("Successfully sent UA.\n");
+
+		sleep(1);
+
+		return 1;
 	}
 	case RECEIVE: {
-		bufSize = 1;
-		printf("Reading from serial port.\n");
-		if (receiveDISC(fd, buf, bufSize)) {
-			printDISC(buf);
+		while (!disconnected) {
+			if (receive(fd, buf, bufSize)) {
+				printBuf(buf);
+				printf("Successfully received DISC.\n");
 
-			if (send(fd, buf, bufSize)) {
-				bufSize = 5;
+				disconnected = 1;
+			}
+		}
 
-				if (receive(fd, buf, bufSize)) {
-					printBuf(buf);
-					close(fd);
-					return 1;
-				} else
-					printf("ERROR: UA was not received.\n");
-			} else
-				printf("ERROR: DISC was not sent.\n");
-		} else
-			printf("ERROR: DISC was not received.\n");
+		int uaReceived = 0;
+		while (!uaReceived) {
+			if (try == 0 || alarmWentOff) {
+				alarmWentOff = 0;
 
-		return 0;
+				if (try >= numTries) {
+					stopAlarm();
+					printf("ERROR: Disconnect could not be sent.\n");
+					return -1;
+				}
+
+				createCommand(C_DISC, buf, bufSize);
+				send(fd, buf, bufSize);
+
+				if (++try == 1)
+					setAlarm();
+			}
+
+			if (receive(fd, buf, bufSize)) {
+				printBuf(buf);
+
+				uaReceived = 1;
+				printf("Successfully received UA.\n");
+			}
+		}
+
+		stopAlarm();
+
+		return 1;
 	}
 	default:
 		break;
@@ -226,14 +286,14 @@ int llclose(int fd, ConnnectionMode mode) {
 }
 
 int send(int fd, unsigned char* buf, unsigned int bufSize) {
-	printf("Sending to serial port.\n");
+	//printf("Sending to serial port.\n");
 
 	if (write(fd, buf, bufSize * sizeof(*buf)) < 0) {
 		printf("ERROR: unable to write.\n");
 		return 0;
 	}
 
-	printf("OK!\n");
+	//printf("OK!\n");
 
 	return 1;
 }
@@ -241,7 +301,7 @@ int send(int fd, unsigned char* buf, unsigned int bufSize) {
 const int DEBUG_STATE_MACHINE = 0;
 
 int receive(int fd, unsigned char* buf, unsigned int bufSize) {
-	printf("Reading from serial port.\n");
+	//printf("Reading from serial port.\n");
 
 	int numReadBytes;
 	State state = START;
@@ -260,7 +320,7 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 			}
 
 			if (!numReadBytes) {
-				printf("ERROR: nothing received.\n");
+				//printf("ERROR: nothing received.\n");
 				return 0;
 			}
 		}
@@ -284,7 +344,7 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 				state = START;
 			break;
 		case A_RCV:
-			if (c == C) {
+			if (c != FLAG) {
 				if (DEBUG_STATE_MACHINE)
 					printf("A_RCV: C received. Going to C_RCV.\n");
 				buf[A_RCV] = c;
@@ -295,7 +355,7 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 				state = START;
 			break;
 		case C_RCV:
-			if (c == (A ^ C)) {
+			if (c == (A ^ buf[A_RCV])) {
 				if (DEBUG_STATE_MACHINE)
 					printf("C_RCV: BCC received. Going to BCC_OK.\n");
 				buf[C_RCV] = c;
@@ -323,40 +383,19 @@ int receive(int fd, unsigned char* buf, unsigned int bufSize) {
 		}
 	}
 
-	printf("OK!\n");
+	//printf("OK!\n");
 
 	return 1;
 }
 
-int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize) {
-	printf("Reading DISC ...\n");
-
-	unsigned char c;
-	unsigned int numReadBytes;
-
-	cleanBuf(buf, bufSize);
-
-	numReadBytes = read(fd, &c, 1);
-
-	if (DEBUG_STATE_MACHINE) {
-		printf("Number of bytes read: %d\n", numReadBytes);
-		if (numReadBytes)
-			printf("Read char: 0x%02x\n", c);
-	}
-
-	if (c == DISC) {
-		buf[0] = c;
-		return 1;
-	} else
-		return 0;
-}
-
-void createSETBuf(unsigned char* buf, unsigned int bufSize) {
+void createCommand(ControlField C, unsigned char* buf, unsigned int bufSize) {
 	cleanBuf(buf, bufSize);
 
 	buf[0] = FLAG;
 	buf[1] = A;
+
 	buf[2] = C;
+
 	buf[3] = buf[1] ^ buf[2];
 	buf[4] = FLAG;
 }

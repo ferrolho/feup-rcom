@@ -39,7 +39,9 @@ int llopen(const char* port, ConnnectionMode mode);
 int llclose(int fd, ConnnectionMode mode);
 int send(int fd, unsigned char* buf, unsigned int bufSize);
 int receive(int fd, unsigned char* buf, unsigned int bufSize);
+int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize);
 
 void createSETBuf(unsigned char* buf, unsigned int bufSize);
 void cleanBuf(unsigned char* buf, unsigned int bufSize);
 void printBuf(unsigned char* buf);
+void printDISC(unsigned char* buf);

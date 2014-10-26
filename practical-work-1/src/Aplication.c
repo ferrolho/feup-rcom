@@ -199,7 +199,6 @@ char * toArray(int number){
 
 int sendFile(const char* port, const char* file_name)
 { 
-    // open file
     FILE* file = fopen(file_name, "r");
     if (!file)
     {
@@ -207,7 +206,6 @@ int sendFile(const char* port, const char* file_name)
         return -1;
     }
 
-    // start link layer
     int fd = llopen(port, TRANSMITTER);
     if (fd == -1)
     {
@@ -268,6 +266,91 @@ int sendFile(const char* port, const char* file_name)
     if (!llclose(fd))
     {
         perror("llclose");
+        return -1;
+    }
+
+    return 0;
+}
+
+int receiveFile(const char* port, const char* file_name)
+{
+    int fd = llopen(term, RECEIVER);
+    if (fd == -1)
+    {
+        perror("llopen");
+        return -1;
+    }
+
+    int ctrl_start, fileSize;
+    char * fileName;
+    if (receiveCtrlPackage(fd, &ctrl_Start, &fileSize, &fileName) != 0)
+    {
+        perror("receiveCtrlPackage (START)");
+        return -1;
+    }
+
+    if (ctrl_start != START)
+    {
+        printf("Control field received (%d) is not START", ctrl_start);
+        return -1;
+    }
+
+    FILE* output_file = fopen(fileName, "wb");
+    if(output_file == NULL)
+    {
+        perror("ERROR: Opening output file");
+        return -1;
+    }
+
+
+    int total_size_read = 0;
+    int seq_number = -1;
+    while (total_size_read != fileSize)
+    {
+        char* buffer;
+        int length;
+        int seq_number_before = seq_number;
+        if (receiveDataPackage(fd, &seq_number, &buffer, &length) != 0)
+        {
+            perror("receiveDataPackage");
+            free(buffer);
+            return -1;
+        }
+
+        if (seq_number != 0 && seq_number_before + 1 != seq_number)
+        {
+            ERRORF("Expected sequence number %d but got %d", seq_number_before + 1, seq_number);
+            free(buffer);
+            return -1;
+        }
+
+        total_size_read += length;
+        fwrite(buffer, sizeof(char), length, output_file);
+        free(buffer);
+    }
+
+    if (fclose(output_file) != 0)
+    {
+        perror("ERROR: Closing output file");
+        return -1;
+    }
+
+    int ctrl_end;
+    if (receiveCtrlPackage(fd, &ctrl_end, '0', "") != 0)
+    {
+        perror("app_receive_control_packet (end)");
+        return -1;
+    }
+
+    if (ctrl_end != END)
+    {
+        printf("Control field received (%d) is not END", ctrl_end);
+        return -1;
+    }
+
+    if (!ll_close(fd))
+    {
+        perror("ll_close");
         return -1;
     }
 

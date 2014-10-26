@@ -27,7 +27,12 @@ int dataLink(const char* port, ConnnectionMode mode) {
 	saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio);
 
 	int portfd = llopen(port, mode);
-	int portclosefd = llclose(portfd, mode);
+
+	printf("\nStarting llclose\n");
+
+	int closeResult = llclose(portfd, mode);
+
+	printf("Result from llclose: %d\n", closeResult);
 
 	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
 		perror("tcsetattr");
@@ -164,20 +169,20 @@ int llwrite() {
 }
 
 int llclose(int fd, ConnnectionMode mode) {
-	int closeResult;
-	unsigned int bufSize;
+	int closeResult = -1;
+	unsigned int bufSize = 5;
 	unsigned char buf[bufSize];
 
 	switch (mode) {
 	case SEND: {
-		bufSize = 1;
 		buf[0] = DISC;
 		if (send(fd, buf, bufSize)) {
-			if (receivedDISC(fd, buf, bufSize)) {
+
+			if (receiveDISC(fd, buf, bufSize)) {
 				printDISC(buf);
-				bufSize = 5;
 				createSETBuf(buf, bufSize);
-				if (send(buf, bufSize)) {
+
+				if (send(fd, buf, bufSize)) {
 					closeResult = close(fd);
 					printf("Serial Port is closed.\n");
 				} else {
@@ -185,10 +190,12 @@ int llclose(int fd, ConnnectionMode mode) {
 					printf("       Cannot close serial port!\n");
 					closeResult = -1;
 				}
+
 			} else {
 				printf("ERROR: DISC was not received.\n");
 				closeResult = -1;
 			}
+
 		} else {
 			printf("ERROR: DISC was not sent.\n");
 			closeResult = -1;
@@ -197,10 +204,13 @@ int llclose(int fd, ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		bufSize = 1;
+		printf("Reading from serial port.\n");
 		if (receiveDISC(fd, buf, bufSize)) {
 			printDISC(buf);
+
 			if (send(fd, buf, bufSize)) {
 				bufSize = 5;
+
 				if (receive(fd, buf, bufSize)) {
 					printBuf(buf);
 					closeResult = close(fd);
@@ -209,10 +219,12 @@ int llclose(int fd, ConnnectionMode mode) {
 					printf("       Cannot close serial port!\n");
 					closeResult = -1;
 				}
+
 			} else {
 				printf("ERROR: DISC was not sent.\n");
 				closeResult = -1;
 			}
+
 		} else {
 			printf("ERROR: DISC was not received.\n");
 			closeResult = -1;
@@ -336,18 +348,22 @@ int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize) {
 	unsigned char c;
 	unsigned int numReadBytes;
 
+	cleanBuf(buf, bufSize);
+
 	numReadBytes = read(fd, &c, 1);
 
-	if (c == DISC)
+	if (DEBUG_STATE_MACHINE) {
+		printf("Number of bytes read: %d\n", numReadBytes);
+		if (numReadBytes)
+			printf("Read char: 0x%02x\n", c);
+	}
+
+	if (c == DISC) {
+		buf[0] = c;
 		return 1;
+	}
 	else
 		return 0;
-}
-
-void printDISC(unsigned char* buf) {
-	printf("-------------------------\n");
-	printf("- DISC: 0x%02x\t\t-\n", buf[0]);
-	printf("-------------------------\n");
 }
 
 void createSETBuf(unsigned char* buf, unsigned int bufSize) {
@@ -373,3 +389,9 @@ void printBuf(unsigned char* buf) {
 	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
 	printf("-------------------------\n");
 }
+void printDISC(unsigned char* buf) {
+	printf("-------------------------\n");
+	printf("- DISC: 0x%02x\t\t-\n", buf[0]);
+	printf("-------------------------\n");
+}
+

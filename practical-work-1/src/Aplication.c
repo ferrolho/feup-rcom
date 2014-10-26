@@ -7,12 +7,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
+
+#define MAX_PACKET_SIZE 255
 
 #define FILE_SIZE 0
 #define FILE_NAME 1
 
+#define START 2
+#define END 3
 
-int SendCtrlPackage(int fd, int C,char* fileSize,char* fileName){
+
+int sendCtrlPackage(int fd, int C,char* fileSize,char* fileName){
 
 	if(C==2)
 		printf("\nControl Package START\n");
@@ -64,7 +70,7 @@ int SendCtrlPackage(int fd, int C,char* fileSize,char* fileName){
 	return 0;
 }
 
-int SendDataPackage(int fd, int seq_number, const char* buffer, int length){
+int sendDataPackage(int fd, int seq_number, const char* buffer, int length){
 
 	int C = 1;
 	int l2 = length/256;
@@ -165,3 +171,105 @@ int receiveCtrlPackage(int fd, int* ctrl, int* fileLength, char** fileName){
     return 0;
 }
 
+int getFileSize(FILE* file)
+{ 
+    int file_size;
+    if (fseek(file, 0L, SEEK_END) == -1)
+    {
+        perror("fseek");
+        return -1;
+    }
+
+    file_size = ftell(file);
+
+    return file_size;
+}
+
+char * toArray(int number){
+    int n = log10(number) + 1;
+    int i;
+  char *numberArray = calloc(n, sizeof(char));
+    for ( i = 0; i < n; ++i, number /= 10 )
+    {
+        numberArray[i] = number % 10;
+    }
+    return numberArray;
+}
+
+
+int sendFile(const char* port, const char* file_name)
+{ 
+    // open file
+    FILE* file = fopen(file_name, "r");
+    if (!file)
+    {
+        perror("fopen");
+        return -1;
+    }
+
+    // start link layer
+    int fd = llopen(port, TRANSMITTER);
+    if (fd == -1)
+    {
+        perror("llopen");
+        return -1;
+    }
+
+    int file_size = getFileSize(file);
+    if (file_size == -1)
+    {
+        perror("getFileSize");
+        return -1;
+    }
+
+    if (sendCtrlPackage(fd, START, toArray(file_size), file_name) != 0)
+    {
+        perror("sendCtrlPackage");
+        return -1;
+    }
+
+    int i = 0;
+
+    char* buffer = malloc(MAX_PACKET_SIZE);
+    size_t readBytes;
+    size_t writeBytes = 0;
+    while ((readBytes = fread(buffer, sizeof(char), MAX_PACKET_SIZE, file)) != 0)
+    {
+        if (sendDataPackage(fd, (i++) % 255, buffer, readBytes) == -1)
+        {
+            perror("sendDataPackage");
+            free(buffer);
+            return -1;
+        }
+
+        writeBytes += readBytes;
+
+        buffer = memset(buffer, 0, MAX_PACKET_SIZE);
+
+        printf("\rProgress: %3d%%", (int)(writeBytes / (float)file_size * 100));
+        fflush(stdout);
+    }
+    printf("\n");
+
+    free(buffer);
+
+    if (fclose(file) != 0)
+    {
+        perror("fclose");
+        return -1;
+    }
+
+    if (sendCtrlPackage(fd, END, '0', "") != 0)
+    {
+        perror("sendCtrlPackage");
+        return -1;
+    }
+
+    if (!llclose(fd))
+    {
+        perror("llclose");
+        return -1;
+    }
+
+    return 0;
+}

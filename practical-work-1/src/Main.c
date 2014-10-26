@@ -37,7 +37,7 @@ static int procArgs(int argc, char** argv) {
 	else {
 		printf(
 				"ERROR: Neither send nor receive specified. Did you misspell something?\n");
-		return 1;
+		return -1;
 	}
 
 	port = argv[2];

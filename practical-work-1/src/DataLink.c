@@ -1,12 +1,3 @@
-/*
- * FEUP - RCOM
- *
- * Authors:
- *  Henrique Ferrolho
- *  Joao Pereira
- *  Miguel Ribeiro
- *
- */
 #include "DataLink.h"
 
 #include <fcntl.h>
@@ -17,351 +8,368 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define FALSE 0
-#define TRUE !FALSE
-#define BAUDRATE B38400
-#define FLAG 0x7E
-#define A 0x03
-#define C 0x03
-#define DISC 0x0B
+const int FALSE = 0;
+const int TRUE = 1;
+const int BAUDRATE = B38400;
+const int FLAG = 0x7E;
+const int A = 0x03;
+const int C = 0x03;
+const int DISC = 0x0B;
 
- typedef enum {
- 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
- } State;
+typedef enum {
+	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
+} State;
 
- int dataLink(const char* port, ConnnectionMode mode) {
- 	int fd = openSerialPort(port);
+int dataLink(const char* port, ConnnectionMode mode) {
+	int fd = openSerialPort(port);
 
- 	struct termios oldtio, newtio;
- 	saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio);
+	struct termios oldtio, newtio;
+	saveCurrentPortSettingsAndSetNewTermios(mode, fd, &oldtio, &newtio);
 
- 	int portfd = llopen(port, mode);
- 	int portclosefd = llclose(portfd, mode);
+	int portfd = llopen(port, mode);
+	int portclosefd = llclose(portfd, mode);
 
- 	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
- 		perror("tcsetattr");
- 		exit(-1);
- 	}
+	if (tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+		perror("tcsetattr");
+		exit(-1);
+	}
 
- 	close(fd);
+	close(fd);
 
- 	return 0;
- }
+	return 0;
+}
 
- int openSerialPort(const char* port) {
+int openSerialPort(const char* port) {
 	// Open serial port device for reading and writing and not as controlling
 	// tty because we don't want to get killed if linenoise sends CTRL-C.
- 	int fd = open(port, O_RDWR | O_NOCTTY);
+	int fd = open(port, O_RDWR | O_NOCTTY);
 
- 	if (fd < 0) {
- 		perror(port);
- 		exit(-1);
- 	}
+	if (fd < 0) {
+		perror(port);
+		exit(-1);
+	}
 
- 	return fd;
- }
+	return fd;
+}
 
- void saveCurrentPortSettingsAndSetNewTermios(ConnnectionMode mode, int fd,
- 	struct termios* oldtio, struct termios* newtio) {
- 	saveCurrentPortSettings(fd, oldtio);
- 	setNewTermios(mode, fd, newtio);
- }
+void saveCurrentPortSettingsAndSetNewTermios(ConnnectionMode mode, int fd,
+		struct termios* oldtio, struct termios* newtio) {
+	saveCurrentPortSettings(fd, oldtio);
+	setNewTermios(mode, fd, newtio);
+}
 
- void saveCurrentPortSettings(int fd, struct termios* oldtio) {
- 	if (tcgetattr(fd, oldtio) == -1) {
- 		perror("tcgetattr");
- 		exit(-1);
- 	}
- }
+void saveCurrentPortSettings(int fd, struct termios* oldtio) {
+	if (tcgetattr(fd, oldtio) == -1) {
+		perror("tcgetattr");
+		exit(-1);
+	}
+}
 
- void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
- 	bzero(newtio, sizeof(*newtio));
- 	newtio->c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
- 	newtio->c_iflag = IGNPAR;
- 	newtio->c_oflag = 0;
- 	newtio->c_lflag = 0;
+void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
+	bzero(newtio, sizeof(*newtio));
+	newtio->c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	newtio->c_iflag = IGNPAR;
+	newtio->c_oflag = 0;
+	newtio->c_lflag = 0;
 
- 	switch (mode) {
- 		case SEND: {
+	switch (mode) {
+	case SEND: {
 		// inter-character timer unused
- 			newtio->c_cc[VTIME] = 30;
+		newtio->c_cc[VTIME] = 30;
 
 		// blocking read until x chars received
- 			newtio->c_cc[VMIN] = 0;
+		newtio->c_cc[VMIN] = 0;
 
- 			break;
- 		}
- 		case RECEIVE: {
+		break;
+	}
+	case RECEIVE: {
 		// inter-character timer unused
- 			newtio->c_cc[VTIME] = 0;
+		newtio->c_cc[VTIME] = 0;
 
 		// blocking read until x chars received
- 			newtio->c_cc[VMIN] = 1;
+		newtio->c_cc[VMIN] = 1;
 
- 			break;
- 		}
- 		default:
- 		break;
- 	}
+		break;
+	}
+	default:
+		break;
+	}
 
- 	tcflush(fd, TCIOFLUSH);
- 	if (tcsetattr(fd, TCSANOW, newtio) == -1) {
- 		perror("tcsetattr");
- 		exit(-1);
- 	} else
- 	printf("New termios structure set.\n");
- }
+	tcflush(fd, TCIOFLUSH);
+	if (tcsetattr(fd, TCSANOW, newtio) == -1) {
+		perror("tcsetattr");
+		exit(-1);
+	} else
+		printf("New termios structure set.\n");
+}
 
- int llopen(const char* port, ConnnectionMode mode) {
- 	int fd = openSerialPort(port);
+int llopen(const char* port, ConnnectionMode mode) {
+	int fd = openSerialPort(port);
+	if (fd < 0)
+		return fd;
 
- 	unsigned int bufSize = 5;
- 	unsigned char buf[bufSize];
+	unsigned int bufSize = 5;
+	unsigned char buf[bufSize];
 
- 	switch (mode) {
- 		case SEND: {
- 			int try, numTries = 4;
+	switch (mode) {
+	case SEND: {
+		int try, numTries = 4;
 
- 			for (try = 0; try < numTries; try++) {
- 				createSETBuf(buf, bufSize);
- 				send(fd, buf, bufSize);
+		for (try = 0; try < numTries; try++) {
+			createSETBuf(buf, bufSize);
+			send(fd, buf, bufSize);
 
- 				if (receive(fd, buf, bufSize)) {
- 					printBuf(buf);
- 					break;
- 				} else {
- 					if (try == numTries - 1) {
- 						printf("Connection aborted.\n");
- 						return -1;
- 					} else
- 					printf("Time out!\n\nRetrying: ");
- 				}
- 			}
+			// TODO work this out
+			// llread();
 
- 			break;
- 		}
- 		case RECEIVE: {
- 			receive(fd, buf, bufSize);
- 			printBuf(buf);
- 			send(fd, buf, bufSize);
- 			break;
- 		}
- 		default:
- 		break;
- 	}
+			if (receive(fd, buf, bufSize)) {
+				printBuf(buf);
+				break;
+			} else {
+				if (try == numTries - 1) {
+					printf("Connection aborted.\n");
+					return -1;
+				} else
+					printf("Time out!\n\nRetrying: ");
+			}
+		}
 
- 	return fd;
- }
+		break;
+	}
+	case RECEIVE: {
+		receive(fd, buf, bufSize);
+		printBuf(buf);
+		// TODO work this out
+		// llwrite();
 
- int llclose(int fd, ConnnectionMode mode) {
+		send(fd, buf, bufSize);
+		// TODO work this out
+		// llread();
 
- 	int closeResult;
- 	unsigned int bufSize;
- 	unsigned char buf[bufSize];
+		break;
+	}
+	default:
+		break;
+	}
 
- 	switch(mode) {
- 		case SEND: {
- 			bufSize = 1;
- 			buf[0] = DISC;
- 			if(send(fd, buf, bufSize)) {
- 				if(receivedDISC(fd, buf, bufSize)) {
- 					printDISC(buf);
- 					bufSize = 5;
- 					createSETBuf(buf, bufSize);
- 					if(send(buf, bufSize)) {
- 						closeResult = close(fd);
- 						printf("Serial Port is closed.\n");
- 					} else {
- 						printf("ERROR: UA was not sent.\n");
- 						printf("       Cannot close serial port!\n");
- 						closeResult = -1;
- 					}
- 				} else {
- 					printf("ERROR: DISC was not received.\n");
- 					closeResult = -1;
- 				}
- 			} else {
- 				printf("ERROR: DISC was not sent.\n");
- 				closeResult = -1;
- 			}
- 			break;
- 		}
+	return fd;
+}
 
- 		case: RECEIVE: {
- 			bufSize = 1;
- 			if(receiveDISC(fd, buf, bufSize)) {
- 				printDISC(buf);
- 				if(send(fd, buf, bufSize)) {
- 					bufSize = 5;
- 					if(receive(fd, buf, bufSize)) {
- 						printBuf(buf);
- 						closeResult = close(fd);
- 					} else {
- 						printf("ERROR: UA was not received.\n");
- 						printf("       Cannot close serial port!\n");
- 						closeResult = -1;
- 					}
- 				} else {
- 					printf("ERROR: DISC was not sent.\n");
- 					closeResult = -1;
- 				}
- 			} else {
- 				printf("ERROR: DISC was not received.\n");
- 				closeResult = -1;
+int llread() {
+	return 1;
+}
 
- 			}
- 			break;
- 		}
+int llwrite() {
+	return 1;
+}
 
- 		default:
- 		break;
- 	}
+int llclose(int fd, ConnnectionMode mode) {
+	int closeResult;
+	unsigned int bufSize;
+	unsigned char buf[bufSize];
 
- 	return closeResult;
- }
+	switch (mode) {
+	case SEND: {
+		bufSize = 1;
+		buf[0] = DISC;
+		if (send(fd, buf, bufSize)) {
+			if (receivedDISC(fd, buf, bufSize)) {
+				printDISC(buf);
+				bufSize = 5;
+				createSETBuf(buf, bufSize);
+				if (send(buf, bufSize)) {
+					closeResult = close(fd);
+					printf("Serial Port is closed.\n");
+				} else {
+					printf("ERROR: UA was not sent.\n");
+					printf("       Cannot close serial port!\n");
+					closeResult = -1;
+				}
+			} else {
+				printf("ERROR: DISC was not received.\n");
+				closeResult = -1;
+			}
+		} else {
+			printf("ERROR: DISC was not sent.\n");
+			closeResult = -1;
+		}
+		break;
+	}
+	case RECEIVE: {
+		bufSize = 1;
+		if (receiveDISC(fd, buf, bufSize)) {
+			printDISC(buf);
+			if (send(fd, buf, bufSize)) {
+				bufSize = 5;
+				if (receive(fd, buf, bufSize)) {
+					printBuf(buf);
+					closeResult = close(fd);
+				} else {
+					printf("ERROR: UA was not received.\n");
+					printf("       Cannot close serial port!\n");
+					closeResult = -1;
+				}
+			} else {
+				printf("ERROR: DISC was not sent.\n");
+				closeResult = -1;
+			}
+		} else {
+			printf("ERROR: DISC was not received.\n");
+			closeResult = -1;
 
- int send(int fd, unsigned char* buf, unsigned int bufSize) {
- 	printf("Sending to serial port.\n");
+		}
+		break;
+	}
+	default:
+		break;
+	}
 
- 	if (write(fd, buf, bufSize * sizeof(*buf)) < 0) {
- 		printf("ERROR: unable to write.\n");
- 		return 0;
- 	}
+	return closeResult;
+}
 
- 	printf("OK!\n");
+int send(int fd, unsigned char* buf, unsigned int bufSize) {
+	printf("Sending to serial port.\n");
 
- 	return 1;
- }
+	if (write(fd, buf, bufSize * sizeof(*buf)) < 0) {
+		printf("ERROR: unable to write.\n");
+		return 0;
+	}
 
- const int DEBUG_STATE_MACHINE = 0;
+	printf("OK!\n");
 
- int receive(int fd, unsigned char* buf, unsigned int bufSize) {
- 	printf("Reading from serial port.\n");
+	return 1;
+}
 
- 	int numReadBytes;
- 	State state = START;
+const int DEBUG_STATE_MACHINE = 0;
 
- 	volatile int done = FALSE;
- 	while (!done) {
- 		unsigned char c;
+int receive(int fd, unsigned char* buf, unsigned int bufSize) {
+	printf("Reading from serial port.\n");
 
- 		if (state != STOP) {
- 			numReadBytes = read(fd, &c, 1);
+	int numReadBytes;
+	State state = START;
 
- 			if (DEBUG_STATE_MACHINE) {
- 				printf("Number of bytes read: %d\n", numReadBytes);
- 				if (numReadBytes)
- 					printf("Read char: 0x%02x\n", c);
- 			}
+	volatile int done = FALSE;
+	while (!done) {
+		unsigned char c;
 
- 			if (!numReadBytes) {
- 				printf("ERROR: nothing received.\n");
- 				return 0;
- 			}
- 		}
+		if (state != STOP) {
+			numReadBytes = read(fd, &c, 1);
 
- 		switch (state) {
- 			case START:
- 			if (c == FLAG) {
- 				if (DEBUG_STATE_MACHINE)
- 					printf("START: FLAG received. Going to FLAG_RCV.\n");
- 				buf[START] = c;
- 				state = FLAG_RCV;
- 			}
- 			break;
- 			case FLAG_RCV:
- 			if (c == A) {
- 				if (DEBUG_STATE_MACHINE)
- 					printf("FLAG_RCV: A received. Going to A_RCV.\n");
- 				buf[FLAG_RCV] = c;
- 				state = A_RCV;
- 			} else if (c != FLAG)
- 			state = START;
- 			break;
- 			case A_RCV:
- 			if (c == C) {
- 				if (DEBUG_STATE_MACHINE)
- 					printf("A_RCV: C received. Going to C_RCV.\n");
- 				buf[A_RCV] = c;
- 				state = C_RCV;
- 			} else if (c == FLAG)
- 			state = FLAG_RCV;
- 			else
- 				state = START;
- 			break;
- 			case C_RCV:
- 			if (c == (A ^ C)) {
- 				if (DEBUG_STATE_MACHINE)
- 					printf("C_RCV: BCC received. Going to BCC_OK.\n");
- 				buf[C_RCV] = c;
- 				state = BCC_OK;
- 			} else if (c == FLAG)
- 			state = FLAG_RCV;
- 			else
- 				state = START;
- 			break;
- 			case BCC_OK:
- 			if (c == FLAG) {
- 				if (DEBUG_STATE_MACHINE)
- 					printf("BCC_OK: FLAG received. Going to STOP.\n");
- 				buf[BCC_OK] = c;
- 				state = STOP;
- 			} else
- 			state = START;
- 			break;
- 			case STOP:
- 			buf[STOP] = 0;
- 			done = TRUE;
- 			break;
- 			default:
- 			break;
- 		}
- 	}
+			if (DEBUG_STATE_MACHINE) {
+				printf("Number of bytes read: %d\n", numReadBytes);
+				if (numReadBytes)
+					printf("Read char: 0x%02x\n", c);
+			}
 
- 	printf("OK!\n");
+			if (!numReadBytes) {
+				printf("ERROR: nothing received.\n");
+				return 0;
+			}
+		}
 
- 	return 1;
- }
+		switch (state) {
+		case START:
+			if (c == FLAG) {
+				if (DEBUG_STATE_MACHINE)
+					printf("START: FLAG received. Going to FLAG_RCV.\n");
+				buf[START] = c;
+				state = FLAG_RCV;
+			}
+			break;
+		case FLAG_RCV:
+			if (c == A) {
+				if (DEBUG_STATE_MACHINE)
+					printf("FLAG_RCV: A received. Going to A_RCV.\n");
+				buf[FLAG_RCV] = c;
+				state = A_RCV;
+			} else if (c != FLAG)
+				state = START;
+			break;
+		case A_RCV:
+			if (c == C) {
+				if (DEBUG_STATE_MACHINE)
+					printf("A_RCV: C received. Going to C_RCV.\n");
+				buf[A_RCV] = c;
+				state = C_RCV;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case C_RCV:
+			if (c == (A ^ C)) {
+				if (DEBUG_STATE_MACHINE)
+					printf("C_RCV: BCC received. Going to BCC_OK.\n");
+				buf[C_RCV] = c;
+				state = BCC_OK;
+			} else if (c == FLAG)
+				state = FLAG_RCV;
+			else
+				state = START;
+			break;
+		case BCC_OK:
+			if (c == FLAG) {
+				if (DEBUG_STATE_MACHINE)
+					printf("BCC_OK: FLAG received. Going to STOP.\n");
+				buf[BCC_OK] = c;
+				state = STOP;
+			} else
+				state = START;
+			break;
+		case STOP:
+			buf[STOP] = 0;
+			done = TRUE;
+			break;
+		default:
+			break;
+		}
+	}
 
- int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize) {
- 	printf("Reading DISC ...\n");
+	printf("OK!\n");
 
- 	unsigned char c;
+	return 1;
+}
 
- 	numReadBytes = read(fd, &c, 1);
+int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize) {
+	printf("Reading DISC ...\n");
 
- 	if(c == DISC)
- 		return 1;
- 	else
- 		return 0;
- }
+	unsigned char c;
+	unsigned int numReadBytes;
 
- void createSETBuf(unsigned char* buf, unsigned int bufSize) {
- 	cleanBuf(buf, bufSize);
+	numReadBytes = read(fd, &c, 1);
 
- 	buf[0] = FLAG;
- 	buf[1] = A;
- 	buf[2] = C;
- 	buf[3] = buf[1] ^ buf[2];
- 	buf[4] = FLAG;
- }
+	if (c == DISC)
+		return 1;
+	else
+		return 0;
+}
 
- void cleanBuf(unsigned char* buf, unsigned int bufSize) {
- 	memset(buf, 0, bufSize * sizeof(*buf));
- }
+void printDISC(unsigned char* buf) {
+	printf("-------------------------\n");
+	printf("- DISC: 0x%02x\t\t-\n", buf[0]);
+	printf("-------------------------\n");
+}
 
- void printBuf(unsigned char* buf) {
- 	printf("-------------------------\n");
- 	printf("- FLAG: 0x%02x\t\t-\n", buf[0]);
- 	printf("- A: 0x%02x\t\t-\n", buf[1]);
- 	printf("- C: 0x%02x\t\t-\n", buf[2]);
- 	printf("- BCC: 0x%02x = 0x%02x\t-\n", buf[3], buf[1] ^ buf[2]);
- 	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
- 	printf("-------------------------\n");
- }
+void createSETBuf(unsigned char* buf, unsigned int bufSize) {
+	cleanBuf(buf, bufSize);
 
- void printDISC(unsigned char* buf) {
- 	printf("-------------------------\n");
- 	printf("- DISC: 0x%02x\t\t-\n", buf[0]);
- 	printf("-------------------------\n");
- }
+	buf[0] = FLAG;
+	buf[1] = A;
+	buf[2] = C;
+	buf[3] = buf[1] ^ buf[2];
+	buf[4] = FLAG;
+}
+
+void cleanBuf(unsigned char* buf, unsigned int bufSize) {
+	memset(buf, 0, bufSize * sizeof(*buf));
+}
+
+void printBuf(unsigned char* buf) {
+	printf("-------------------------\n");
+	printf("- FLAG: 0x%02x\t\t-\n", buf[0]);
+	printf("- A: 0x%02x\t\t-\n", buf[1]);
+	printf("- C: 0x%02x\t\t-\n", buf[2]);
+	printf("- BCC: 0x%02x = 0x%02x\t-\n", buf[3], buf[1] ^ buf[2]);
+	printf("- FLAG: 0x%02x\t\t-\n", buf[4]);
+	printf("-------------------------\n");
+}

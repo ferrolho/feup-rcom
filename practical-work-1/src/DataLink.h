@@ -6,9 +6,10 @@
 #define MAX_SIZE 256
 
 struct LinkLayer {
-	// device /dev/ttySx, x = 0, 1, ...
+	// port /dev/ttySx
 	char port[20];
 
+	// connection mode
 	ConnnectionMode mode;
 
 	// transmission speed
@@ -36,7 +37,10 @@ void saveCurrentPortSettings(int fd, struct termios* oldtio);
 void setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio);
 
 int llopen(const char* port, ConnnectionMode mode);
+int llread();
+int llwrite();
 int llclose(int fd, ConnnectionMode mode);
+
 int send(int fd, unsigned char* buf, unsigned int bufSize);
 int receive(int fd, unsigned char* buf, unsigned int bufSize);
 int receiveDISC(int fd, unsigned char* buf, unsigned int bufSize);

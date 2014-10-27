@@ -11,6 +11,20 @@ struct applicationLayer {
 	char * fileName ;
 };
 
-int SendCntrlPackage(int ValC,char* fileSizeOct,char* fileName);
+int sendCtrlPackage(int fd, int C,char* fileSize,char* fileName);
 
-int SendDataPackage(int ValC,char* fileSizeOct,char* fileName);
+int sendDataPackage(int fd, int seq_number, const char* buffer, int length);
+
+int receiveDataPackege(int fd, int* seq_number, char** buffer, int* length);
+
+int receiveCtrlPackage(int fd, int* ctrl, int* fileLength, char** fileName);
+
+int sendFile(const char* port, const char* file_name);
+
+int getFileSize(FILE* file);
+
+char * toArray(int number);
+
+int sendFile(const char* port, const char* file_name);
+
+int receiveFile(const char* port, const char* file_name);

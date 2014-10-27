@@ -15,6 +15,7 @@ const int TRUE = 1;
 const int BAUDRATE = B38400;
 const int FLAG = 0x7E;
 const int A = 0x03;
+const int ESCAPE = 0x7D;
 
 LinkLayer* ll;
 
@@ -24,6 +25,7 @@ int initLinkLayer(const char* port, ConnnectionMode mode) {
 	strcpy(ll->port, port);
 	ll->mode = mode;
 	ll->baudRate = BAUDRATE;
+	ll->sequenceNumber = 0;
 	ll->timeout = 3;
 	ll->numTries = 4;
 
@@ -160,13 +162,13 @@ int llopen(const char* port, ConnnectionMode mode) {
 					return 0;
 				}
 
-				send(fd, SET);
+				sendCommand(fd, SET);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (receive(fd, UA)) {
+			if (messageIsCommand(receive(fd), UA)) {
 				connected = 1;
 
 				printf("*** Successfully established a connection. ***\n");
@@ -179,8 +181,8 @@ int llopen(const char* port, ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		while (!connected) {
-			if (receive(fd, SET)) {
-				send(fd, UA);
+			if (messageIsCommand(receive(fd), SET)) {
+				sendCommand(fd, UA);
 				connected = 1;
 
 				printf("*** Successfully established a connection. ***\n");
@@ -196,11 +198,39 @@ int llopen(const char* port, ConnnectionMode mode) {
 	return fd;
 }
 
-int llwrite() {
+int llwrite(int fd, const char* buf, ui bufSize) {
+	int try = 0, transferring = 1;
+
+	while (transferring) {
+		if (try == 0 || alarmWentOff) {
+			alarmWentOff = 0;
+
+			if (try >= ll->numTries) {
+				stopAlarm();
+				printf("ERROR: Maximum number of retries exceeded.\n");
+				printf("Message not sent.\n");
+				return 0;
+			}
+
+			sendMessage(fd, buf, bufSize);
+
+			if (++try == 1)
+				setAlarm();
+		}
+
+		if (messageIsCommand(receive(fd), RR)) {
+			transferring = 0;
+
+			printf("*** Successfully established a connection. ***\n");
+		}
+	}
+
+	stopAlarm();
+
 	return 1;
 }
 
-int llread() {
+int llread(int fd, char** buf) {
 	return 1;
 }
 
@@ -222,18 +252,18 @@ int llclose(int fd, ConnnectionMode mode) {
 					return 0;
 				}
 
-				send(fd, DISC);
+				sendCommand(fd, DISC);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (receive(fd, DISC))
+			if (messageIsCommand(receive(fd), DISC))
 				disconnected = 1;
 		}
 
 		stopAlarm();
-		send(fd, UA);
+		sendCommand(fd, UA);
 		sleep(1);
 
 		printf("*** Connection terminated. ***\n");
@@ -242,7 +272,7 @@ int llclose(int fd, ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		while (!disconnected) {
-			if (receive(fd, DISC))
+			if (messageIsCommand(receive(fd), DISC))
 				disconnected = 1;
 		}
 
@@ -257,13 +287,13 @@ int llclose(int fd, ConnnectionMode mode) {
 					return -1;
 				}
 
-				send(fd, DISC);
+				sendCommand(fd, DISC);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (receive(fd, UA))
+			if (messageIsCommand(receive(fd), UA))
 				uaReceived = 1;
 		}
 
@@ -279,37 +309,21 @@ int llclose(int fd, ConnnectionMode mode) {
 	return 0;
 }
 
-int send(int fd, Command command) {
-	// TODO refactor this - pull up method
+void createCommand(ControlField C, unsigned char* buf, ui bufSize) {
+	cleanBuf(buf, bufSize);
+
+	buf[0] = FLAG;
+	buf[1] = A;
+	buf[2] = C;
+	buf[3] = buf[1] ^ buf[2];
+	buf[4] = FLAG;
+}
+
+int sendCommand(int fd, Command command) {
 	char commandStr[MAX_SIZE];
-	ControlField ctrlField;
+	ControlField ctrlField = getCommandControlField(commandStr, command);
 
-	switch (command) {
-	case SET:
-		strcpy(commandStr, "SET");
-		ctrlField = C_SET;
-		break;
-	case UA:
-		strcpy(commandStr, "UA");
-		ctrlField = C_UA;
-		break;
-	case RR:
-		strcpy(commandStr, "RR");
-		ctrlField = C_RR;
-		break;
-	case REJ:
-		strcpy(commandStr, "REJ");
-		ctrlField = C_REJ;
-		break;
-	case DISC:
-		strcpy(commandStr, "DISC");
-		ctrlField = C_DISC;
-		break;
-	default:
-		return 0;
-	}
-
-	unsigned int bufSize = 5;
+	ui bufSize = 5;
 	unsigned char buf[bufSize];
 	createCommand(ctrlField, buf, bufSize);
 
@@ -324,12 +338,94 @@ int send(int fd, Command command) {
 	return 0;
 }
 
+Command getCommandWithControlField(ControlField controlField) {
+	switch (controlField) {
+	case C_SET:
+		return SET;
+	case C_UA:
+		return UA;
+	case C_RR:
+		return RR;
+	case C_REJ:
+		return REJ;
+	case C_DISC:
+		return DISC;
+	default:
+		return SET;
+	}
+}
+
+ControlField getCommandControlField(char* commandStr, Command command) {
+	switch (command) {
+	case SET:
+		strcpy(commandStr, "SET");
+		return C_SET;
+	case UA:
+		strcpy(commandStr, "UA");
+		return C_UA;
+	case RR:
+		strcpy(commandStr, "RR");
+		return C_RR;
+	case REJ:
+		strcpy(commandStr, "REJ");
+		return C_REJ;
+	case DISC:
+		strcpy(commandStr, "DISC");
+		return C_DISC;
+	default:
+		strcpy(commandStr, "* ERROR *");
+		return C_SET;
+	}
+}
+
 const int DEBUG_STATE_MACHINE = 0;
 
-int receive(int fd, Command command) {
-	unsigned int bufSize = 5;
-	unsigned char buf[bufSize];
-	// cleanBuf(buf, bufSize);
+const int MSG_SIZE = 6 * sizeof(char);
+
+char* createMessage(const char* buf, ui bufSize, int sn) {
+	char* msg = malloc(MSG_SIZE + bufSize);
+
+	msg[0] = FLAG;
+	msg[1] = A;
+	msg[2] = sn << 1;
+	msg[3] = msg[1] ^ msg[2];
+
+	memcpy(&msg[4], buf, bufSize);
+
+	char BCC = 0;
+	int i;
+	for (i = 0; i < bufSize; i++)
+		BCC ^= buf[i];
+
+	msg[4 + bufSize] = BCC;
+	msg[5 + bufSize] = FLAG;
+
+	return msg;
+}
+
+int sendMessage(int fd, const char* buf, ui bufSize) {
+	char* msg = createMessage(buf, bufSize, ll->sequenceNumber);
+	bufSize += MSG_SIZE;
+
+	bufSize = stuff(&msg, bufSize);
+
+	ui numWrittenBytes = write(fd, msg, bufSize);
+	if (numWrittenBytes != bufSize)
+		perror("ERROR: error while sending message.\n");
+
+	free(msg);
+
+	return numWrittenBytes == bufSize;
+}
+
+#define FRAME_SIZE 256
+
+Message* receive(int fd) {
+	Message* msg = (Message*) malloc(sizeof(Message));
+	msg->type = INVALID;
+
+	ui bufSize = 0;
+	unsigned char* buf = malloc(FRAME_SIZE);
 
 	State state = START;
 
@@ -348,7 +444,8 @@ int receive(int fd, Command command) {
 
 			if (!numReadBytes) {
 				// printf("ERROR: nothing received.\n");
-				return 0;
+				msg->type = INVALID;
+				return msg;
 			}
 		}
 
@@ -357,7 +454,7 @@ int receive(int fd, Command command) {
 			if (c == FLAG) {
 				if (DEBUG_STATE_MACHINE)
 					printf("START: FLAG received. Going to FLAG_RCV.\n");
-				buf[START] = c;
+				buf[bufSize++] = c;
 				state = FLAG_RCV;
 			}
 			break;
@@ -365,44 +462,76 @@ int receive(int fd, Command command) {
 			if (c == A) {
 				if (DEBUG_STATE_MACHINE)
 					printf("FLAG_RCV: A received. Going to A_RCV.\n");
-				buf[FLAG_RCV] = c;
+				buf[bufSize++] = c;
 				state = A_RCV;
-			} else if (c != FLAG)
+			} else if (c != FLAG) {
+				bufSize = 0;
 				state = START;
+			}
 			break;
 		case A_RCV:
 			if (c != FLAG) {
 				if (DEBUG_STATE_MACHINE)
 					printf("A_RCV: C received. Going to C_RCV.\n");
-				buf[A_RCV] = c;
+				buf[bufSize++] = c;
 				state = C_RCV;
 			} else if (c == FLAG)
 				state = FLAG_RCV;
-			else
+			else {
+				bufSize = 0;
 				state = START;
+			}
 			break;
 		case C_RCV:
 			if (c == (A ^ buf[A_RCV])) {
 				if (DEBUG_STATE_MACHINE)
 					printf("C_RCV: BCC received. Going to BCC_OK.\n");
-				buf[C_RCV] = c;
+				buf[bufSize++] = c;
 				state = BCC_OK;
 			} else if (c == FLAG)
 				state = FLAG_RCV;
-			else
+			else {
+				bufSize = 0;
 				state = START;
+			}
 			break;
 		case BCC_OK:
 			if (c == FLAG) {
+				if (msg->type == INVALID) {
+					msg->type = COMMAND;
+
+					buf[bufSize++] = c;
+				} else {
+					char BCC = 0;
+					int i;
+					for (i = 0; i < bufSize; i++)
+						BCC ^= buf[i];
+
+					buf[bufSize++] = BCC;
+
+					buf[bufSize++] = c;
+				}
+
+				state = STOP;
+
 				if (DEBUG_STATE_MACHINE)
 					printf("BCC_OK: FLAG received. Going to STOP.\n");
-				buf[BCC_OK] = c;
-				state = STOP;
+			} else if (c != FLAG && msg->type == INVALID) {
+				msg->type = DATA;
+
+				buf[bufSize++] = c;
+			} else if (c != FLAG && msg->type == DATA) {
+				if (bufSize % FRAME_SIZE == 0) {
+					int mult = bufSize / FRAME_SIZE + 1;
+					buf = (unsigned char*) realloc(buf, mult * FRAME_SIZE);
+				}
+
+				buf[bufSize++] = c;
 			} else
 				state = START;
 			break;
 		case STOP:
-			buf[STOP] = 0;
+			buf[bufSize] = 0;
 			done = TRUE;
 			break;
 		default:
@@ -410,57 +539,70 @@ int receive(int fd, Command command) {
 		}
 	}
 
-	// TODO refactor this - pull up method
-	char commandStr[MAX_SIZE];
-	ControlField ctrlField;
+	if (msg->type == COMMAND) {
+		msg->command = getCommandWithControlField(buf[2]);
 
-	switch (command) {
-	case SET:
-		strcpy(commandStr, "SET");
-		ctrlField = C_SET;
-		break;
-	case UA:
-		strcpy(commandStr, "UA");
-		ctrlField = C_UA;
-		break;
-	case RR:
-		strcpy(commandStr, "RR");
-		ctrlField = C_RR;
-		break;
-	case REJ:
-		strcpy(commandStr, "REJ");
-		ctrlField = C_REJ;
-		break;
-	case DISC:
-		strcpy(commandStr, "DISC");
-		ctrlField = C_DISC;
-		break;
-	default:
-		return 0;
+		char commandStr[MAX_SIZE];
+		getCommandControlField(commandStr, msg->command);
+		printf("RECEIVED: %s.\n", commandStr);
 	}
 
-	if (buf[2] == ctrlField) {
-		printf("RECEIVED: %s.\n", commandStr);
-		printBuf(buf);
+	msg->messageSize = bufSize;
+	msg->message = malloc(msg->messageSize);
+	memcpy(msg->message, &buf[4], msg->messageSize);
 
-		return 1;
-	} else
-		printf("ERROR: %s command was not received.\n", commandStr);
+	printBuf(buf);
+	free(buf);
 
-	return 0;
+	return msg;
 }
 
-void createCommand(ControlField C, unsigned char* buf, unsigned int bufSize) {
-	cleanBuf(buf, bufSize);
-
-	buf[0] = FLAG;
-	buf[1] = A;
-	buf[2] = C;
-	buf[3] = buf[1] ^ buf[2];
-	buf[4] = FLAG;
+int messageIsCommand(Message* msg, Command command) {
+	return msg->type == COMMAND && msg->command == command;
 }
 
-void cleanBuf(unsigned char* buf, unsigned int bufSize) {
+ui stuff(char** buf, ui bufSize) {
+	ui newBufSize = bufSize;
+	int i;
+
+	for (i = 1; i < bufSize - 1; i++)
+		if ((*buf)[i] == FLAG || (*buf)[i] == ESCAPE)
+			newBufSize++;
+
+	*buf = (char*) realloc(*buf, newBufSize);
+
+	for (i = 1; i < bufSize - 1; i++) {
+		if ((*buf)[i] == FLAG || (*buf)[i] == ESCAPE) {
+			memmove(*buf + i + 1, *buf + i, bufSize - i);
+
+			bufSize++;
+
+			(*buf)[i] = ESCAPE;
+			(*buf)[i + 1] ^= 0x20;
+		}
+	}
+
+	return newBufSize;
+}
+
+ui destuff(char** buf, ui bufSize) {
+	int i;
+	for (i = 1; i < bufSize - 1; ++i) {
+		if ((*buf)[i] == ESCAPE) {
+			memmove(*buf + i, *buf + i + 1, bufSize - i - 1);
+
+			bufSize--;
+
+			(*buf)[i] ^= 0x20;
+		}
+	}
+
+	*buf = (char*) realloc(*buf, bufSize);
+
+	return bufSize;
+}
+
+void cleanBuf(unsigned char* buf, ui bufSize) {
 	memset(buf, 0, bufSize * sizeof(*buf));
 }
 

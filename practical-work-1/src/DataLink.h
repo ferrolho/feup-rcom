@@ -3,6 +3,8 @@
 #include <termios.h>
 #include "ConnectionMode.h"
 
+typedef unsigned int ui;
+
 #define MAX_SIZE 256
 
 typedef enum {
@@ -17,6 +19,17 @@ typedef enum {
 	C_SET = 0x03, C_UA = 0x07, C_RR = 0x05, C_REJ = 0x01, C_DISC = 0x0B
 } ControlField;
 
+typedef enum {
+	COMMAND, DATA, INVALID
+} MessageType;
+
+typedef struct {
+	MessageType type;
+	Command command;
+	unsigned char* message;
+	ui messageSize;
+} Message;
+
 typedef struct {
 	// port /dev/ttySx
 	char port[20];
@@ -28,13 +41,13 @@ typedef struct {
 	int baudRate;
 
 	// frame sequence number (0, 1)
-	unsigned int sequenceNumber;
+	ui sequenceNumber;
 
 	// timeout value
-	unsigned int timeout;
+	ui timeout;
 
 	// number of retries in case of failure
-	unsigned int numTries;
+	ui numTries;
 
 	// trama
 	char frame[MAX_SIZE];
@@ -52,13 +65,23 @@ int saveCurrentPortSettings(int fd, struct termios* oldtio);
 int setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio);
 
 int llopen(const char* port, ConnnectionMode mode);
-int llwrite();
-int llread();
+int llwrite(int fd, const char* buf, ui bufSize);
+int llread(int fd, char** buf);
 int llclose(int fd, ConnnectionMode mode);
 
-int send(int fd, Command command);
-int receive(int fd, Command command);
+void createCommand(ControlField C, unsigned char* buf, ui bufSize);
+int sendCommand(int fd, Command command);
+Command getCommandWithControlField(ControlField controlField);
+ControlField getCommandControlField(char* commandStr, Command command);
 
-void createCommand(ControlField C, unsigned char* buf, unsigned int bufSize);
-void cleanBuf(unsigned char* buf, unsigned int bufSize);
+char* createMessage(const char* buf, ui bufSize, int sn);
+int sendMessage(int fd, const char* buf, ui bufSize);
+
+Message* receive(int fd);
+int messageIsCommand(Message* msg, Command command);
+
+ui stuff(char** buf, ui bufSize);
+ui destuff(char** buf, ui bufSize);
+
+void cleanBuf(unsigned char* buf, ui bufSize);
 void printBuf(unsigned char* buf);

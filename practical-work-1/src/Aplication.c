@@ -179,17 +179,6 @@ int getFileSize(FILE* file) {
 	return file_size;
 }
 
-// TODO Fix this shit
-char* toArray(int number) {
-	/* int n = log10(number) + 1;
-	int i;
-	char *numberArray = calloc(n, sizeof(char));
-	for (i = 0; i < n; ++i, number /= 10) {
-		numberArray[i] = number % 10;
-	}
-	return numberArray; */
-	return '0';
-}
 
 int sendFile(char* port, char* fileName) {
 	FILE* file = fopen(fileName, "r");
@@ -210,7 +199,10 @@ int sendFile(char* port, char* fileName) {
 		return -1;
 	}
 
-	if (sendCtrlPackage(fd, C_START, toArray(file_size), fileName) != 0) {
+	char file_size_buf[sizeof(int)*3+2];
+	snprintf(file_size_buf, sizeof file_size_buf, "%d", file_size);
+
+	if (sendCtrlPackage(fd, C_START, file_size_buf, fileName) != 0) {
 		perror("sendCtrlPackage");
 		return -1;
 	}

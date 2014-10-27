@@ -209,44 +209,38 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 	if (C == 3)
 		printf("Sending END control package.\n");
 
-	int totalBufferSize = 1 + strlen(fileSize) + strlen(fileName);
+	int bufSize = 1 + strlen(fileSize) + strlen(fileName);
 
-	char controlPackage[totalBufferSize];
-	controlPackage[0] = C; //start = 1 end = 2
+	char controlPackage[bufSize];
 
-	//tamanho do ficheiro
+	controlPackage[0] = C;
+
+	// file size
 	controlPackage[1] = 0;
 	controlPackage[2] = strlen(fileSize);
 
-	int position_act = 3;
+	ui i = 0, pos = 3;
+	for (i = 0; i < strlen(fileSize); i++)
+		controlPackage[pos++] = fileSize[i];
 
-	unsigned int i = 0;
-	for (i = 0; i < strlen(fileSize); i++) {
-		controlPackage[position_act] = fileSize[i];
-		position_act++;
-	}
+	// file name
+	controlPackage[pos++] = 1;
+	controlPackage[pos++] = strlen(fileName);
 
-	// nome do ficheiro
-	controlPackage[position_act] = 1;
-	position_act++;
-	controlPackage[position_act] = strlen(fileName);
-	position_act++;
+	for (i = 0; i < strlen(fileName); i++)
+		controlPackage[pos++] = fileName[i];
 
-	i = 0;
-	for (i = 0; i < strlen(fileName); i++) {
-		controlPackage[position_act] = fileName[i];
-		position_act++;
-	}
+	printf("File: %s\n", fileName);
+	printf("Size: %s (bytes)\n", fileSize);
 
-	printf("Nome: %s  Tamanho do ficheiro em bytes: %s\n", fileName, fileSize);
-
-	if (!llwrite(fd, &controlPackage[0], totalBufferSize)) {
-		printf("llwrite\n");
+	if (!llwrite(fd, &controlPackage[0], bufSize)) {
+		printf(
+				"ERROR: Could not write to link layer while sending control package.\n");
 		free(controlPackage);
-		return -1;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 int receiveControlPackage(int fd, int* package, int* fileLength,

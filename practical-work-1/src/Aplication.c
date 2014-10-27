@@ -305,7 +305,7 @@ int receiveFile(char* port, char* file_name) {
 	}
 
 	int ctrl_end;
-	if (receiveCtrlPackage(fd, &ctrl_end, '0', "") != 0) {
+	if (receiveCtrlPackage(fd, &ctrl_end, (int *)0, (char **)"") != 0) {
 		perror("app_receive_control_packet (end)");
 		return -1;
 	}

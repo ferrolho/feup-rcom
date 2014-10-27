@@ -24,11 +24,11 @@ int startConnection();
 int sendFile();
 int receiveFile();
 
-int sendCtrlPackage(int fd, int C, char* fileSize, char* fileName);
-int receiveCtrlPackage(int fd, int* ctrl, int* fileLength, char** fileName);
+int sendControlPackage(int fd, int C, char* fileSize, char* fileName);
+int receiveControlPackage(int fd, int* ctrl, int* fileLength, char** fileName);
 
-int sendDataPackage(int fd, int sn, const char* buffer, int length);
-int receiveDataPackege(int fd, int* sn, char** buffer, int* length);
+int sendDataPackage(int fd, int sn, const char* buf, int length);
+int receiveDataPackage(int fd, int* sn, char** buf, int* length);
 
 int getFileSize(FILE* file);
 char* toArray(int number);

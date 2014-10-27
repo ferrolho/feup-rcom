@@ -14,8 +14,8 @@
 #define FILE_SIZE 0
 #define FILE_NAME 1
 
-int C_START = 2;
-int C_END = 3;
+int C_PKG_START = 2;
+int C_PKG_END = 3;
 
 ApplicationLayer* al;
 
@@ -63,59 +63,59 @@ int startConnection() {
 int sendFile() {
 	FILE* file = fopen(al->fileName, "rb");
 	if (!file) {
-		printf("ERROR: fopen\n");
-		return -1;
+		printf("ERROR: Could not open file to be sent.\n");
+		return 0;
 	}
 
 	int fd = llopen(ll->mode);
 	if (fd <= 0)
 		return 0;
 
-	int file_size = getFileSize(file);
-	if (file_size == -1) {
-		perror("getFileSize");
-		return -1;
+	int fileSize = getFileSize(file);
+	if (fileSize == -1) {
+		printf("ERROR: Could not get size of file to be sent.\n");
+		return 0;
 	}
 
-	char file_size_buf[sizeof(int) * 3 + 2];
-	snprintf(file_size_buf, sizeof file_size_buf, "%d", file_size);
+	char fileSizeBuf[sizeof(int) * 3 + 2];
+	snprintf(fileSizeBuf, sizeof fileSizeBuf, "%d", fileSize);
 
-	if (sendCtrlPackage(al->fd, C_START, file_size_buf, al->fileName) != 0) {
-		printf("ERROR: sendCtrlPackage\n");
-		return -1;
+	if (!sendControlPackage(al->fd, C_PKG_START, fileSizeBuf, al->fileName)) {
+		printf("ERROR: Control package could not be sent.\n");
+		return 0;
 	}
+
+	char* buf = malloc(MAX_SIZE);
+	ui readBytes = 0, writtenBytes = 0;
 
 	int i = 0;
-	char* buffer = malloc(MAX_SIZE);
-	ui readBytes = 0, writeBytes = 0;
-
-	while ((readBytes = fread(buffer, sizeof(char), MAX_SIZE, file)) != 0) {
-		if (sendDataPackage(fd, (i++) % 255, buffer, readBytes) == -1) {
-			printf("ERROR: sendDataPackage\n");
-			free(buffer);
-			return -1;
+	while ((readBytes = fread(buf, sizeof(char), MAX_SIZE, file)) != 0) {
+		if (!sendDataPackage(fd, (i++) % 255, buf, readBytes)) {
+			printf("ERROR: Data package could not be sent.\n");
+			free(buf);
+			return 0;
 		}
 
-		writeBytes += readBytes;
+		writtenBytes += readBytes;
 
-		buffer = memset(buffer, 0, MAX_SIZE);
+		buf = memset(buf, 0, MAX_SIZE);
 
 		printf("\rProgress: %3d%%",
-				(int) (writeBytes / (float) file_size * 100));
+				(int) (writtenBytes / (float) fileSize * 100));
 		fflush(stdout);
 	}
 	printf("\n");
 
-	free(buffer);
+	free(buf);
 
 	if (fclose(file) != 0) {
-		printf("fclose\n");
-		return -1;
+		printf("ERROR: Unable to close file.\n");
+		return 0;
 	}
 
-	if (sendCtrlPackage(fd, C_END, "0", "") != 0) {
-		printf("sendCtrlPackage\n");
-		return -1;
+	if (!sendControlPackage(fd, C_PKG_END, "0", "")) {
+		printf("ERROR: Could not sent Control package.\n");
+		return 0;
 	}
 
 	if (!llclose(al->fd, ll->mode)) {
@@ -123,7 +123,7 @@ int sendFile() {
 		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 int receiveFile() {
@@ -131,48 +131,51 @@ int receiveFile() {
 	if (fd <= 0)
 		return 0;
 
-	int ctrlStart, fileSize;
+	int controlStart, fileSize;
 	char* fileName;
 
-	if (!receiveCtrlPackage(al->fd, &ctrlStart, &fileSize, &fileName)) {
-		printf("Receive START control package.\n");
-		return -1;
+	if (!receiveControlPackage(al->fd, &controlStart, &fileSize, &fileName)) {
+		printf("ERROR: Could not receive START control package.\n");
+		return 0;
 	}
 
-	if (ctrlStart != C_START) {
-		printf("Control field received (%d) is not START", ctrlStart);
-		return -1;
+	if (controlStart != C_PKG_START) {
+		printf(
+				"ERROR: Control package received but its control field - %d - is not C_PKG_START",
+				controlStart);
+		return 0;
 	}
 
 	FILE* outputFile = fopen(al->fileName, "wb");
 	if (outputFile == NULL) {
 		printf("ERROR: Could not create output file.\n");
-		return -1;
+		return 0;
 	}
 
-	int total_size_read = 0;
-	int seq_number = -1;
-	while (total_size_read != fileSize) {
+	int fileSizeReadSoFar = 0;
+	int sn = -1;
 
+	while (fileSizeReadSoFar != fileSize) {
 		char* buf = (char*) calloc('0', sizeof(char));
 
 		int length = 0;
-		int seq_number_before = seq_number;
-		if (!receiveDataPackage(al->fd, &seq_number, &buf, &length)) {
-			printf("ERROR: receiveDataPackage\n");
+		int lastSn = sn;
+
+		if (!receiveDataPackage(al->fd, &sn, &buf, &length)) {
+			printf("ERROR: Could not receive data package.\n");
 			free(buf);
-			return -1;
+			return 0;
 		}
 
-		if (seq_number != 0 && seq_number_before + 1 != seq_number) {
-			printf("Expected sequence number %d but got %d",
-					seq_number_before + 1, seq_number);
+		if (sn != 0 && sn != 1 && lastSn != !sn) {
+			printf("ERROR: Received sequence no. was %d instead of %d.\n", sn,
+					!lastSn);
 			free(buf);
-			return -1;
+			return 0;
 		}
 
-		total_size_read += length;
-		fwrite(buf, 1, length, outputFile);
+		fileSizeReadSoFar += length;
+		fwrite(buf, sizeof(char), length, outputFile);
 		free(buf);
 	}
 
@@ -181,15 +184,15 @@ int receiveFile() {
 		return -1;
 	}
 
-	int ctrlEnd;
-	if (!receiveCtrlPackage(al->fd, &ctrlEnd, (int*) 0, (char**) "")) {
+	int controlEnd;
+	if (!receiveControlPackage(al->fd, &controlEnd, (int*) 0, (char**) "")) {
 		printf("ERROR: Received control package end.\n");
-		return -1;
+		return 0;
 	}
 
-	if (ctrlEnd != C_END) {
-		printf("ERROR: Control field received (%d) is not END.\n", ctrlEnd);
-		return -1;
+	if (controlEnd != C_PKG_END) {
+		printf("ERROR: Control field received (%d) is not END.\n", controlEnd);
+		return 0;
 	}
 
 	if (!llclose(al->fd, ll->mode)) {
@@ -197,14 +200,14 @@ int receiveFile() {
 		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
-int sendCtrlPackage(int fd, int C, char* fileSize, char* fileName) {
+int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 	if (C == 2)
-		printf("Control Package START\n");
+		printf("Sending START control package.\n");
 	if (C == 3)
-		printf("Control Package END\n");
+		printf("Sending END control package.\n");
 
 	int totalBufferSize = 1 + strlen(fileSize) + strlen(fileName);
 
@@ -244,6 +247,53 @@ int sendCtrlPackage(int fd, int C, char* fileSize, char* fileName) {
 	}
 
 	return 0;
+}
+
+int receiveControlPackage(int fd, int* package, int* fileLength,
+		char** fileName) {
+	char* receivedPackage;
+	ui totalSize = llread(fd, &receivedPackage);
+	if (totalSize < 0) {
+		printf("ERROR: Received package is empty.\n");
+		return 0;
+	}
+
+	printf("Received package.\n");
+	*package = receivedPackage[0];
+
+	ui numParams = 2, current_index = 1;
+	unsigned int numOcts, i;
+
+	for (i = 0; i < numParams; i++) {
+
+		int paramType = receivedPackage[current_index];
+		current_index++;
+
+		switch (paramType) {
+		case FILE_SIZE: {
+			numOcts = (ui) receivedPackage[current_index];
+			current_index++;
+
+			char* length = malloc(numOcts);
+			memcpy(length, &receivedPackage[current_index], numOcts);
+
+			*fileLength = atoi(length);
+
+			free(length);
+			break;
+		}
+
+		case FILE_NAME:
+			numOcts = (unsigned char) receivedPackage[current_index];
+			current_index++;
+
+			memcpy(*fileName, &receivedPackage[current_index], numOcts);
+
+			break;
+		}
+	}
+
+	return 1;
 }
 
 int sendDataPackage(int fd, int sn, const char* buffer, int length) {
@@ -297,52 +347,6 @@ int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
 
 	*sn = seq;
 	*length = bufSize;
-
-	return 1;
-}
-
-int receiveCtrlPackage(int fd, int* ctrl, int* fileLength, char** fileName) {
-	char* receivedPackage;
-	ui totalSize = llread(fd, &receivedPackage);
-	if (totalSize < 0) {
-		printf("ERROR: Received package is empty.\n");
-		return 0;
-	}
-
-	printf("Received package.\n");
-	*ctrl = receivedPackage[0];
-
-	ui numParams = 2, current_index = 1;
-	unsigned int numOcts, i;
-
-	for (i = 0; i < numParams; i++) {
-
-		int paramType = receivedPackage[current_index];
-		current_index++;
-
-		switch (paramType) {
-		case FILE_SIZE: {
-			numOcts = (ui) receivedPackage[current_index];
-			current_index++;
-
-			char* length = malloc(numOcts);
-			memcpy(length, &receivedPackage[current_index], numOcts);
-
-			*fileLength = atoi(length);
-
-			free(length);
-			break;
-		}
-
-		case FILE_NAME:
-			numOcts = (unsigned char) receivedPackage[current_index];
-			current_index++;
-
-			memcpy(*fileName, &receivedPackage[current_index], numOcts);
-
-			break;
-		}
-	}
 
 	return 1;
 }

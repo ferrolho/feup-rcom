@@ -250,7 +250,8 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 	char* receivedPackage;
 	ui totalSize = llread(fd, &receivedPackage);
 	if (totalSize < 0) {
-		printf("ERROR: Received control package is empty.\n");
+		printf(
+				"ERROR: Could not read from link layer while receiving control package.\n");
 		return 0;
 	}
 
@@ -316,19 +317,20 @@ int sendDataPackage(int fd, int sn, const char* buffer, int length) {
 
 int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
 	char* receivedPackage;
-	ui totalSize = llread(fd, &receivedPackage);
-	if (totalSize < 0) {
-		perror("llread");
+	ui size = llread(fd, &receivedPackage);
+	if (size < 0) {
+		printf(
+				"ERROR: Could not read from link layer while receiving data package.\n");
 		return 0;
 	}
 
 	if (receivedPackage[0] != 1) {
-		printf("ERROR: Received package is NOT a Data Package C = %d",
+		printf("ERROR: Received package is not a data package: C = %d\n",
 				receivedPackage[0]);
 		return 0;
 	}
 
-	int seq = (unsigned char) receivedPackage[1];
+	int seqNumber = (unsigned char) receivedPackage[1];
 
 	int bufSize = 256 * (unsigned char) receivedPackage[2]
 			+ (unsigned char) receivedPackage[3];
@@ -338,7 +340,7 @@ int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
 
 	free(receivedPackage);
 
-	*sn = seq;
+	*sn = seqNumber;
 	*length = bufSize;
 
 	return 1;

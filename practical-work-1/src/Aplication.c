@@ -86,11 +86,14 @@ int sendFile() {
 		return 0;
 	}
 
+	printf("Start control package sent.\n");
+
 	char* buf = malloc(MAX_SIZE);
 	ui readBytes = 0, writtenBytes = 0;
 
 	int i = 0;
 	while ((readBytes = fread(buf, sizeof(char), MAX_SIZE, file)) != 0) {
+		printf("Reading file chunk.\n");
 		if (!sendDataPackage(fd, (i++) % 255, buf, readBytes)) {
 			printf("ERROR: Data package could not be sent.\n");
 			free(buf);
@@ -205,13 +208,7 @@ int receiveFile() {
 }
 
 int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
-	if (C == 2)
-		printf("Sending START control package.\n");
-	if (C == 3)
-		printf("Sending END control package.\n");
-
 	int bufSize = 1 + strlen(fileSize) + strlen(fileName);
-
 	char controlPackage[bufSize];
 
 	controlPackage[0] = C;
@@ -233,6 +230,11 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 
 	printf("File: %s\n", fileName);
 	printf("Size: %s (bytes)\n", fileSize);
+
+	if (C == 2)
+		printf("Sending START control package.\n");
+	if (C == 3)
+		printf("Sending END control package.\n");
 
 	if (!llwrite(fd, &controlPackage[0], bufSize)) {
 		printf(
@@ -325,7 +327,7 @@ int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
 	}
 
 	if (receivedPackage[0] != 1) {
-		printf("ERROR: Received package is not a data package: C = %d\n",
+		printf("ERROR: Received package is not a data package (C = %d).\n",
 				receivedPackage[0]);
 		return 0;
 	}

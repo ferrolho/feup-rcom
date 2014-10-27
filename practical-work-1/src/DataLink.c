@@ -555,7 +555,7 @@ Message* receive(int fd) {
 
 		char commandStr[MAX_SIZE];
 		getCommandControlField(commandStr, msg->command);
-		printf("RECEIVED: %s.\n", commandStr);
+		printf("RECEIVED: %s\n", commandStr);
 	}
 
 	msg->messageSize = bufSize;

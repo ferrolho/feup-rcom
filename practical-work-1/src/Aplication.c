@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include "DataLink.h"
 #include "ConnectionMode.h"
+#include "Utilities.h"
 
 #define FILE_SIZE 0
 #define FILE_NAME 1
@@ -237,6 +238,7 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 		printf(
 				"ERROR: Could not write to link layer while sending control package.\n");
 		free(controlPackage);
+
 		return 0;
 	}
 
@@ -248,40 +250,34 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 	char* receivedPackage;
 	ui totalSize = llread(fd, &receivedPackage);
 	if (totalSize < 0) {
-		printf("ERROR: Received package is empty.\n");
+		printf("ERROR: Received control package is empty.\n");
 		return 0;
 	}
 
-	printf("Received package.\n");
+	printf("Received a control package.\n");
 	*package = receivedPackage[0];
 
-	ui numParams = 2, current_index = 1;
-	unsigned int numOcts, i;
+	ui numParams = 2, pos = 1, numOcts = 0;
 
+	unsigned int i;
 	for (i = 0; i < numParams; i++) {
-
-		int paramType = receivedPackage[current_index];
-		current_index++;
+		int paramType = receivedPackage[pos++];
 
 		switch (paramType) {
 		case FILE_SIZE: {
-			numOcts = (ui) receivedPackage[current_index];
-			current_index++;
+			numOcts = (ui) receivedPackage[pos++];
 
 			char* length = malloc(numOcts);
-			memcpy(length, &receivedPackage[current_index], numOcts);
+			memcpy(length, &receivedPackage[pos], numOcts);
 
 			*fileLength = atoi(length);
-
 			free(length);
+
 			break;
 		}
-
 		case FILE_NAME:
-			numOcts = (unsigned char) receivedPackage[current_index];
-			current_index++;
-
-			memcpy(*fileName, &receivedPackage[current_index], numOcts);
+			numOcts = (unsigned char) receivedPackage[pos++];
+			memcpy(*fileName, &receivedPackage[pos], numOcts);
 
 			break;
 		}
@@ -292,27 +288,30 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 
 int sendDataPackage(int fd, int sn, const char* buffer, int length) {
 	int C = 1;
-	int l2 = length / 256;
-	int l1 = length % 256;
+	int L2 = length / 256;
+	int L1 = length % 256;
 
-	ui packageSize = 4 + (l2 + l1); // 1 + 1 + 1 + 1 + (l2 + l1)
+	ui packageSize = 4 + (L2 + L1);
 
-	char* ctrlPackage = (char*) malloc(packageSize);
+	char* controlPackage = (char*) malloc(packageSize);
 
-	ctrlPackage[0] = C;
-	ctrlPackage[1] = sn;
-	ctrlPackage[2] = l2;
-	ctrlPackage[3] = l1;
-	memcpy(&ctrlPackage[4], buffer, length);
+	controlPackage[0] = C;
+	controlPackage[1] = sn;
+	controlPackage[2] = L2;
+	controlPackage[3] = L1;
+	memcpy(&controlPackage[4], buffer, length);
 
-	if (!llwrite(fd, ctrlPackage, packageSize)) {
-		printf("llwrite\n");
-		free(ctrlPackage);
-		return -1;
+	if (!llwrite(fd, controlPackage, packageSize)) {
+		printf(
+				"ERROR: Could not write to link layer while sending data package.\n");
+		free(controlPackage);
+
+		return 0;
 	}
 
-	free(ctrlPackage);
-	return 0;
+	free(controlPackage);
+
+	return 1;
 }
 
 int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
@@ -343,16 +342,4 @@ int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
 	*length = bufSize;
 
 	return 1;
-}
-
-int getFileSize(FILE* file) {
-	int file_size;
-	if (fseek(file, 0L, SEEK_END) == -1) {
-		printf("fseek\n");
-		return -1;
-	}
-
-	file_size = ftell(file);
-
-	return file_size;
 }

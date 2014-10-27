@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <termios.h>
 #include "ConnectionMode.h"
-#include "Utilities.h"
 
 typedef struct {
 	// serial port file descriptor
@@ -29,6 +28,3 @@ int receiveControlPackage(int fd, int* ctrl, int* fileLength, char** fileName);
 
 int sendDataPackage(int fd, int sn, const char* buf, int length);
 int receiveDataPackage(int fd, int* sn, char** buf, int* length);
-
-int getFileSize(FILE* file);
-char* toArray(int number);

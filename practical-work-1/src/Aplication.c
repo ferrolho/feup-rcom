@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "DataLink.h"
+#include "ConnectionMode.h"
 
 #define MAX_PACKET_SIZE 255
 #define FILE_SIZE 0
@@ -179,17 +180,10 @@ int getFileSize(FILE* file) {
 	return file_size;
 }
 
-
-int sendFile(char* port, char* fileName) {
+int sendFile(int fd, char* fileName) {
 	FILE* file = fopen(fileName, "r");
 	if (!file) {
 		perror("fopen");
-		return -1;
-	}
-
-	int fd = llopen(port, SEND);
-	if (fd == -1) {
-		perror("llopen");
 		return -1;
 	}
 
@@ -199,7 +193,7 @@ int sendFile(char* port, char* fileName) {
 		return -1;
 	}
 
-	char file_size_buf[sizeof(int)*3+2];
+	char file_size_buf[sizeof(int) * 3 + 2];
 	snprintf(file_size_buf, sizeof file_size_buf, "%d", file_size);
 
 	if (sendCtrlPackage(fd, C_START, file_size_buf, fileName) != 0) {
@@ -240,21 +234,10 @@ int sendFile(char* port, char* fileName) {
 		return -1;
 	}
 
-	if (!llclose(fd, SEND)) { // TODO check if mode is SEND
-		perror("llclose");
-		return -1;
-	}
-
 	return 0;
 }
 
-int receiveFile(char* port, char* file_name) {
-	int fd = llopen(port, RECEIVE);
-	if (fd == -1) {
-		perror("llopen");
-		return -1;
-	}
-
+int receiveFile(int fd) {
 	int ctrl_start, fileSize;
 	char * fileName;
 	if (receiveCtrlPackage(fd, &ctrl_start, &fileSize, &fileName) != 0) {
@@ -305,7 +288,7 @@ int receiveFile(char* port, char* file_name) {
 	}
 
 	int ctrl_end;
-	if (receiveCtrlPackage(fd, &ctrl_end, (int *)0, (char **)"") != 0) {
+	if (receiveCtrlPackage(fd, &ctrl_end, (int *) 0, (char **) "") != 0) {
 		perror("app_receive_control_packet (end)");
 		return -1;
 	}
@@ -314,11 +297,16 @@ int receiveFile(char* port, char* file_name) {
 		printf("Control field received (%d) is not END", ctrl_end);
 		return -1;
 	}
+	return 0;
+}
 
-	if (!llclose(fd, RECEIVE)) {
-		perror("ll_close");
-		return -1;
-	}
+int startConnection(int port, ConnnectionMode mode, char * file) {
+
+	if (mode == RECEIVE)
+		receiveFile(port);
+	else if(mode == SEND)
+		sendFile(port, file);
 
 	return 0;
+
 }

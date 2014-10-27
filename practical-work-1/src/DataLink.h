@@ -53,8 +53,8 @@ typedef struct {
 	char frame[MAX_SIZE];
 } LinkLayer;
 
-int initLinkLayer(const char* port, ConnnectionMode mode);
-int startDataLink();
+int initLinkLayer(const char* port, ConnnectionMode mode, char* file);
+int startDataLink(char * file);
 
 int openSerialPort(const char* port);
 int closeSerialPort(int fd, struct termios* oldtio);

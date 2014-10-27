@@ -19,7 +19,7 @@ const int ESCAPE = 0x7D;
 
 LinkLayer* ll;
 
-int initLinkLayer(const char* port, ConnnectionMode mode) {
+int initLinkLayer(const char* port, ConnnectionMode mode, char * file) {
 	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
 
 	strcpy(ll->port, port);
@@ -29,12 +29,12 @@ int initLinkLayer(const char* port, ConnnectionMode mode) {
 	ll->timeout = 3;
 	ll->numTries = 4;
 
-	startDataLink();
+	startDataLink(file);
 
 	return 1;
 }
 
-int startDataLink() {
+int startDataLink(char * file) {
 	int fd = openSerialPort(ll->port);
 	if (fd < 0)
 		return 0;
@@ -47,6 +47,7 @@ int startDataLink() {
 	int portfd = llopen(ll->port, ll->mode);
 	if (portfd <= 0)
 		return 0;
+	//todo
 
 	if (!llclose(portfd, ll->mode))
 		return 0;

@@ -16,5 +16,6 @@ int receiveDataPackege(int fd, int* sn, char** buffer, int* length);
 int receiveCtrlPackage(int fd, int* ctrl, int* fileLength, char** fileName);
 int getFileSize(FILE* file);
 char* toArray(int number);
-int sendFile(char* port, char* fileName);
-int receiveFile(char* port, char* fileName);
+int sendFile(int port, char* fileName);
+int receiveFile(int port);
+int startConnection(int port, ConnnectionMode mode, char * file);

@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "Aplication.h"
 
 const int FALSE = 0;
 const int TRUE = 1;
@@ -19,7 +20,7 @@ const int ESCAPE = 0x7D;
 
 LinkLayer* ll;
 
-int initLinkLayer(const char* port, ConnnectionMode mode, char * file) {
+int initLinkLayer(const char* port, ConnnectionMode mode) {
 	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
 
 	strcpy(ll->port, port);
@@ -29,31 +30,58 @@ int initLinkLayer(const char* port, ConnnectionMode mode, char * file) {
 	ll->timeout = 3;
 	ll->numTries = 4;
 
-	startDataLink(file);
+	if (!saveCurrentPortSettingsAndSetNewTermios()) {
+		printf(
+				"ERROR: Could not save current port settings and set new termios.\n");
+		return 0;
+	}
 
 	return 1;
 }
 
-int startDataLink(char * file) {
-	int fd = openSerialPort(ll->port);
-	if (fd < 0)
+int saveCurrentPortSettingsAndSetNewTermios() {
+	if (!saveCurrentTermiosSettings()) {
+		printf("ERROR: Could not save current termios settings.\n");
+		return 0;
+	}
+
+	if (!setNewTermios()) {
+		printf("ERROR: Could not set new termios settings.\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+int saveCurrentTermiosSettings() {
+	if (tcgetattr(al->fd, &ll->oldtio) != 0) {
+		printf("ERROR: Could not save current termios settings.\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+int setNewTermios() {
+	bzero(&ll->newtio, sizeof(ll->newtio));
+	ll->newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	ll->newtio.c_iflag = IGNPAR;
+	ll->newtio.c_oflag = 0;
+	ll->newtio.c_lflag = 0;
+
+	// inter-character timer unused
+	ll->newtio.c_cc[VTIME] = 3;
+
+	// blocking read until x chars received
+	ll->newtio.c_cc[VMIN] = 0;
+
+	if (tcflush(al->fd, TCIOFLUSH) != 0)
 		return 0;
 
-	struct termios oldtio, newtio;
-	if (!saveCurrentPortSettingsAndSetNewTermios(ll->mode, fd, &oldtio,
-			&newtio))
+	if (tcsetattr(al->fd, TCSANOW, &ll->newtio) != 0)
 		return 0;
 
-	int portfd = llopen(ll->port, ll->mode);
-	if (portfd <= 0)
-		return 0;
-	//todo
-
-	if (!llclose(portfd, ll->mode))
-		return 0;
-
-	if (!closeSerialPort(fd, &oldtio))
-		return 0;
+	printf("New termios structure set.\n");
 
 	return 1;
 }
@@ -64,55 +92,13 @@ int openSerialPort(const char* port) {
 	return open(port, O_RDWR | O_NOCTTY);
 }
 
-int closeSerialPort(int fd, struct termios* oldtio) {
-	if (tcsetattr(fd, TCSANOW, oldtio) == -1) {
+int closeSerialPort() {
+	if (tcsetattr(al->fd, TCSANOW, &ll->oldtio) == -1) {
 		perror("tcsetattr");
 		return 0;
 	}
 
-	close(fd);
-
-	return 1;
-}
-
-int saveCurrentPortSettingsAndSetNewTermios(ConnnectionMode mode, int fd,
-		struct termios* oldtio, struct termios* newtio) {
-	if (!saveCurrentPortSettings(fd, oldtio))
-		return 0;
-
-	if (!setNewTermios(mode, fd, newtio))
-		return 0;
-
-	return 1;
-}
-
-int saveCurrentPortSettings(int fd, struct termios* oldtio) {
-	if (tcgetattr(fd, oldtio) != 0)
-		return 0;
-
-	return 1;
-}
-
-int setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio) {
-	bzero(newtio, sizeof(*newtio));
-	newtio->c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-	newtio->c_iflag = IGNPAR;
-	newtio->c_oflag = 0;
-	newtio->c_lflag = 0;
-
-	// inter-character timer unused
-	newtio->c_cc[VTIME] = 3;
-
-	// blocking read until x chars received
-	newtio->c_cc[VMIN] = 0;
-
-	if (tcflush(fd, TCIOFLUSH) != 0)
-		return 0;
-
-	if (tcsetattr(fd, TCSANOW, newtio) != 0)
-		return 0;
-
-	printf("New termios structure set.\n");
+	close(al->fd);
 
 	return 1;
 }
@@ -141,12 +127,8 @@ void stopAlarm() {
 	alarm(0);
 }
 
-int llopen(const char* port, ConnnectionMode mode) {
+int llopen(ConnnectionMode mode) {
 	printf("*** Trying to establish a connection. ***\n");
-
-	int fd = openSerialPort(port);
-	if (fd < 0)
-		return fd;
 
 	int try = 0, connected = 0;
 
@@ -163,13 +145,13 @@ int llopen(const char* port, ConnnectionMode mode) {
 					return 0;
 				}
 
-				sendCommand(fd, SET);
+				sendCommand(al->fd, SET);
 
 				if (++try == 1)
 					setAlarm();
 			}
 
-			if (messageIsCommand(receive(fd), UA)) {
+			if (messageIsCommand(receive(al->fd), UA)) {
 				connected = 1;
 
 				printf("*** Successfully established a connection. ***\n");
@@ -182,8 +164,8 @@ int llopen(const char* port, ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		while (!connected) {
-			if (messageIsCommand(receive(fd), SET)) {
-				sendCommand(fd, UA);
+			if (messageIsCommand(receive(al->fd), SET)) {
+				sendCommand(al->fd, UA);
 				connected = 1;
 
 				printf("*** Successfully established a connection. ***\n");
@@ -196,7 +178,7 @@ int llopen(const char* port, ConnnectionMode mode) {
 		break;
 	}
 
-	return fd;
+	return al->fd;
 }
 
 int llwrite(int fd, const char* buf, ui bufSize) {
@@ -231,7 +213,35 @@ int llwrite(int fd, const char* buf, ui bufSize) {
 	return 1;
 }
 
-int llread(int fd, char** buf) {
+int llread(int fd, char** message) {
+	Message* msg = NULL;
+
+	int done = 0;
+	while (!done) {
+		msg = receive(fd);
+
+		switch (msg->type) {
+		case INVALID:
+			sendCommand(fd, C_REJ);
+			break;
+		case COMMAND:
+			if (msg->command == DISC)
+				done = 1;
+			break;
+		case DATA:
+			*message = malloc(msg->messageSize);
+			memcpy(*message, msg->message, msg->messageSize);
+			free(msg->message);
+
+			ll->sequenceNumber = !ll->sequenceNumber;
+			sendCommand(fd, RR);
+
+			done = 1;
+
+			break;
+		}
+	}
+
 	return 1;
 }
 

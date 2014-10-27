@@ -2,10 +2,7 @@
 
 #include <termios.h>
 #include "ConnectionMode.h"
-
-typedef unsigned int ui;
-
-#define MAX_SIZE 256
+#include "Utilities.h"
 
 typedef enum {
 	START, FLAG_RCV, A_RCV, C_RCV, BCC_OK, STOP
@@ -51,22 +48,25 @@ typedef struct {
 
 	// trama
 	char frame[MAX_SIZE];
+
+	// old and new termios
+	struct termios oldtio, newtio;
 } LinkLayer;
 
-int initLinkLayer(const char* port, ConnnectionMode mode, char* file);
-int startDataLink(char * file);
+extern LinkLayer* ll;
+
+int initLinkLayer(const char* port, ConnnectionMode mode);
+
+int saveCurrentPortSettingsAndSetNewTermios();
+int saveCurrentTermiosSettings();
+int setNewTermios();
 
 int openSerialPort(const char* port);
-int closeSerialPort(int fd, struct termios* oldtio);
+int closeSerialPort();
 
-int saveCurrentPortSettingsAndSetNewTermios(ConnnectionMode mode, int fd,
-		struct termios* oldtio, struct termios* newtio);
-int saveCurrentPortSettings(int fd, struct termios* oldtio);
-int setNewTermios(ConnnectionMode mode, int fd, struct termios* newtio);
-
-int llopen(const char* port, ConnnectionMode mode);
+int llopen(ConnnectionMode mode);
 int llwrite(int fd, const char* buf, ui bufSize);
-int llread(int fd, char** buf);
+int llread(int fd, char** message);
 int llclose(int fd, ConnnectionMode mode);
 
 void createCommand(ControlField C, unsigned char* buf, ui bufSize);

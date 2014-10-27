@@ -1,6 +1,7 @@
 #include "Aplication.h"
 
 #include <errno.h>
+#include <math.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,12 +11,11 @@
 #include "DataLink.h"
 
 #define MAX_PACKET_SIZE 255
+#define FILE_SIZE 0
+#define FILE_NAME 1
 
-const int FILE_SIZE = 0;
-const int FILE_NAME = 1;
-
-const int START = 2;
-const int END = 3;
+int C_START = 2;
+int C_END = 3;
 
 int sendCtrlPackage(int fd, int C, char* fileSize, char* fileName) {
 	if (C == 2)
@@ -65,19 +65,18 @@ int sendCtrlPackage(int fd, int C, char* fileSize, char* fileName) {
 	return 0;
 }
 
-int sendDataPackage(int fd, int seq_number, const char* buffer, int length) {
+int sendDataPackage(int fd, int sn, const char* buffer, int length) {
 
 	int C = 1;
 	int l2 = length / 256;
 	int l1 = length % 256;
 
-	int packetSize = 1 + 1 + 1 + 1 + (l2 + l1);
+	ui packetSize = 4 + (l2 + l1); // 1 + 1 + 1 + 1 + (l2 + l1)
 
-	char ctrlPackage[packetSize];
-	char* ctrlPackage = malloc(packetSize);
+	char* ctrlPackage = (char*) malloc(packetSize);
 
 	ctrlPackage[0] = C;
-	ctrlPackage[1] = seq_number;
+	ctrlPackage[1] = sn;
 	ctrlPackage[2] = l2;
 	ctrlPackage[3] = l1;
 	memcpy(&ctrlPackage[4], buffer, length);
@@ -92,10 +91,10 @@ int sendDataPackage(int fd, int seq_number, const char* buffer, int length) {
 	return 0;
 }
 
-int receiveDataPackege(int fd, int* seq_number, char** buffer, int* length) {
+int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
 
-	char* receviedPackage;
-	ssize_t totalSize = ll_read(fd, &receviedPackage);
+	char* receivedPackage;
+	ui totalSize = llread(fd, &receivedPackage);
 	if (totalSize < 0) {
 		perror("ll_read");
 		return 0;
@@ -109,57 +108,60 @@ int receiveDataPackege(int fd, int* seq_number, char** buffer, int* length) {
 
 	int seq = (unsigned char) receivedPackage[1];
 
-	int bufferSize = 256 * (unsigned char) receivedPackage[2]
+	int bufSize = 256 * (unsigned char) receivedPackage[2]
 			+ (unsigned char) receivedPackage[3];
 
-	*buffer = malloc(bufferSize);
-	memcpy(*buffer, &receivedPackage[4], bufferSize);
+	*buf = malloc(bufSize);
+	memcpy(*buf, &receivedPackage[4], bufSize);
 
 	free(receivedPackage);
 
-	*seq_number = seq;
-	*length = bufferSize;
+	*sn = seq;
+	*length = bufSize;
+
+	return 0;
 }
 
 int receiveCtrlPackage(int fd, int* ctrl, int* fileLength, char** fileName) {
 
 	char* receivedPackage;
-	ssize_t totalSize = ll_read(fd, &receviedPackage);
+	ui totalSize = llread(fd, &receivedPackage);
 	if (totalSize < 0) {
 		perror("ll_read");
 		return 0;
 	}
 
-	*ctrl = receviedPackage[0];
+	*ctrl = receivedPackage[0];
 
-	unsigned int numParams = 2;
-	unsigned int current_index = 1
-	unsigned int numOcts;
+	ui numParams = 2, current_index = 1, numOcts, i;
 
-	for(int i = 0; i < numParams) {
+	for (i = 0; i < numParams; i++) {
 
-		paramType = receviedPackage[current_index];
+		int paramType = receivedPackage[current_index];
 		current_index++;
 
-		switch(paramType) {
-			case FILE_SIZE:
-			numOcts = (unsigned char)receviedPackage[current_index];
+		switch (paramType) {
+		case FILE_SIZE: {
+			numOcts = (ui) receivedPackage[current_index];
 			current_index++;
 
-			char * length = malloc(numOcts);
+			char* length = malloc(numOcts);
 			memcpy(length, &receivedPackage[current_index], numOcts);
 
-			*filelength = atoi(length);
-			break;
-			case FILE_NAME:
-			numOcts = (unsigned char)receviedPackage[current_index];
-			current_index++;
+			*fileLength = atoi(length);
 
-			memcpy(*fileName, &receivedPackage[current_index], numOcts);
+			free(length);
 			break;
 		}
 
-		free(length);
+		case FILE_NAME:
+			numOcts = (unsigned char) receivedPackage[current_index];
+			current_index++;
+
+			memcpy(*fileName, &receivedPackage[current_index], numOcts);
+
+			break;
+		}
 	}
 
 	return 0;
@@ -177,24 +179,26 @@ int getFileSize(FILE* file) {
 	return file_size;
 }
 
-char * toArray(int number) {
-	int n = log10(number) + 1;
+// TODO Fix this shit
+char* toArray(int number) {
+	/* int n = log10(number) + 1;
 	int i;
 	char *numberArray = calloc(n, sizeof(char));
 	for (i = 0; i < n; ++i, number /= 10) {
 		numberArray[i] = number % 10;
 	}
-	return numberArray;
+	return numberArray; */
+	return '0';
 }
 
-int sendFile(const char* port, const char* file_name) {
-	FILE* file = fopen(file_name, "r");
+int sendFile(char* port, char* fileName) {
+	FILE* file = fopen(fileName, "r");
 	if (!file) {
 		perror("fopen");
 		return -1;
 	}
 
-	int fd = llopen(port, TRANSMITTER);
+	int fd = llopen(port, SEND);
 	if (fd == -1) {
 		perror("llopen");
 		return -1;
@@ -206,16 +210,15 @@ int sendFile(const char* port, const char* file_name) {
 		return -1;
 	}
 
-	if (sendCtrlPackage(fd, START, toArray(file_size), file_name) != 0) {
+	if (sendCtrlPackage(fd, C_START, toArray(file_size), fileName) != 0) {
 		perror("sendCtrlPackage");
 		return -1;
 	}
 
 	int i = 0;
-
 	char* buffer = malloc(MAX_PACKET_SIZE);
-	size_t readBytes;
-	size_t writeBytes = 0;
+	ui readBytes, writeBytes = 0;
+
 	while ((readBytes = fread(buffer, sizeof(char), MAX_PACKET_SIZE, file)) != 0) {
 		if (sendDataPackage(fd, (i++) % 255, buffer, readBytes) == -1) {
 			perror("sendDataPackage");
@@ -240,12 +243,12 @@ int sendFile(const char* port, const char* file_name) {
 		return -1;
 	}
 
-	if (sendCtrlPackage(fd, END, '0', "") != 0) {
+	if (sendCtrlPackage(fd, C_END, "0", "") != 0) {
 		perror("sendCtrlPackage");
 		return -1;
 	}
 
-	if (!llclose(fd)) {
+	if (!llclose(fd, SEND)) { // TODO check if mode is SEND
 		perror("llclose");
 		return -1;
 	}
@@ -253,8 +256,8 @@ int sendFile(const char* port, const char* file_name) {
 	return 0;
 }
 
-int receiveFile(const char* port, const char* file_name) {
-	int fd = llopen(term, RECEIVER);
+int receiveFile(char* port, char* file_name) {
+	int fd = llopen(port, RECEIVE);
 	if (fd == -1) {
 		perror("llopen");
 		return -1;
@@ -262,12 +265,12 @@ int receiveFile(const char* port, const char* file_name) {
 
 	int ctrl_start, fileSize;
 	char * fileName;
-	if (receiveCtrlPackage(fd, &ctrl_Start, &fileSize, &fileName) != 0) {
+	if (receiveCtrlPackage(fd, &ctrl_start, &fileSize, &fileName) != 0) {
 		perror("receiveCtrlPackage (START)");
 		return -1;
 	}
 
-	if (ctrl_start != START) {
+	if (ctrl_start != C_START) {
 		printf("Control field received (%d) is not START", ctrl_start);
 		return -1;
 	}
@@ -281,25 +284,27 @@ int receiveFile(const char* port, const char* file_name) {
 	int total_size_read = 0;
 	int seq_number = -1;
 	while (total_size_read != fileSize) {
-		char* buffer;
-		int length;
+
+		char* buf = (char*) calloc('0', sizeof(char));
+
+		int length = 0;
 		int seq_number_before = seq_number;
-		if (receiveDataPackage(fd, &seq_number, &buffer, &length) != 0) {
+		if (receiveDataPackage(fd, &seq_number, &buf, &length) != 0) {
 			perror("receiveDataPackage");
-			free(buffer);
+			free(buf);
 			return -1;
 		}
 
 		if (seq_number != 0 && seq_number_before + 1 != seq_number) {
-			ERRORF("Expected sequence number %d but got %d",
+			printf("Expected sequence number %d but got %d",
 					seq_number_before + 1, seq_number);
-			free(buffer);
+			free(buf);
 			return -1;
 		}
 
 		total_size_read += length;
-		fwrite(buffer, sizeof(char), length, output_file);
-		free(buffer);
+		fwrite(buf, 1, length, output_file);
+		free(buf);
 	}
 
 	if (fclose(output_file) != 0) {
@@ -313,12 +318,12 @@ int receiveFile(const char* port, const char* file_name) {
 		return -1;
 	}
 
-	if (ctrl_end != END) {
+	if (ctrl_end != C_END) {
 		printf("Control field received (%d) is not END", ctrl_end);
 		return -1;
 	}
 
-	if (!llclose(fd)) {
+	if (!llclose(fd, RECEIVE)) {
 		perror("ll_close");
 		return -1;
 	}

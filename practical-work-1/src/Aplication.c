@@ -10,13 +10,9 @@
 #include <unistd.h>
 #include "DataLink.h"
 #include "ConnectionMode.h"
+#include "ControlPackageType.h"
+#include "ParameterType.h"
 #include "Utilities.h"
-
-#define FILE_SIZE 0
-#define FILE_NAME 1
-
-const int C_PKG_START = 2;
-const int C_PKG_END = 3;
 
 ApplicationLayer* al;
 
@@ -82,7 +78,8 @@ int sendFile() {
 	char fileSizeBuf[sizeof(int) * 3 + 2];
 	snprintf(fileSizeBuf, sizeof fileSizeBuf, "%d", fileSize);
 
-	if (!sendControlPackage(al->fd, C_PKG_START, fileSizeBuf, al->fileName)) {
+	if (!sendControlPackage(al->fd, CTRL_PKG_START, fileSizeBuf,
+			al->fileName)) {
 		printf("ERROR: Control package could not be sent.\n");
 		return 0;
 	}
@@ -90,11 +87,10 @@ int sendFile() {
 	char* buf = malloc(MAX_SIZE);
 	ui readBytes = 0, writtenBytes = 0;
 
-	int i = 0;
 	while ((readBytes = fread(buf, sizeof(char), MAX_SIZE, file)) > 0) {
-		printf("Read file chunk size: %d (bytes).\n", readBytes);
+		// printf("Read file chunk size: %d (bytes).\n", readBytes);
 
-		if (!sendDataPackage(fd, (i++) % 255, buf, readBytes)) {
+		if (!sendDataPackage(fd, ll->sequenceNumber, buf, readBytes)) {
 			printf("ERROR: Data package could not be sent.\n");
 			free(buf);
 			return 0;
@@ -104,19 +100,14 @@ int sendFile() {
 		buf = memset(buf, 0, MAX_SIZE);
 
 		int transferredPercentage = 100.0 * writtenBytes / fileSize;
-		printf("Completed: %03d%%\n", transferredPercentage);
-		// fflush(stdout);
+		printf("\rCompleted: %03d%%", transferredPercentage);
+		fflush(stdout);
 	}
+	printf("\n");
 
-	printf("*** File successfully transferred. ***\n");
 	free(buf);
 
-	if (fclose(file) != 0) {
-		printf("ERROR: Unable to close file.\n");
-		return 0;
-	}
-
-	if (!sendControlPackage(fd, C_PKG_END, "0", "")) {
+	if (!sendControlPackage(fd, CTRL_PKG_END, "0", "")) {
 		printf("ERROR: Could not sent Control package.\n");
 		return 0;
 	}
@@ -126,6 +117,13 @@ int sendFile() {
 		return 0;
 	}
 
+	if (fclose(file) != 0) {
+		printf("ERROR: Unable to close file.\n");
+		return 0;
+	}
+
+	printf("*** File successfully transferred. ***\n");
+
 	return 1;
 }
 
@@ -134,6 +132,7 @@ int receiveFile() {
 	if (fd <= 0)
 		return 0;
 
+	// TODO create struct to carry these
 	int controlStart, fileSize;
 	char* fileName;
 
@@ -142,7 +141,7 @@ int receiveFile() {
 		return 0;
 	}
 
-	if (controlStart != C_PKG_START) {
+	if (controlStart != CTRL_PKG_START) {
 		printf(
 				"ERROR: Control package received but its control field - %d - is not C_PKG_START",
 				controlStart);
@@ -155,11 +154,14 @@ int receiveFile() {
 		return 0;
 	}
 
+	printf("Successfully created output file: %s.\n", al->fileName);
+	printf("Size of the file to be received: %d (bytes).\n", fileSize);
+
 	int fileSizeReadSoFar = 0;
 	int sn = -1;
 
 	while (fileSizeReadSoFar != fileSize) {
-		char* buf = (char*) calloc('0', sizeof(char));
+		char* buf = (char*) calloc(0, sizeof(char));
 
 		int length = 0;
 		int lastSn = sn;
@@ -182,18 +184,20 @@ int receiveFile() {
 		free(buf);
 	}
 
+	printf("*** File successfully received. ***\n");
+
 	if (fclose(outputFile) != 0) {
 		printf("ERROR: Closing output file.\n");
 		return -1;
 	}
 
 	int controlEnd;
-	if (!receiveControlPackage(al->fd, &controlEnd, (int*) 0, (char**) "")) {
+	if (!receiveControlPackage(al->fd, &controlEnd, 0, NULL)) {
 		printf("ERROR: Received control package end.\n");
 		return 0;
 	}
 
-	if (controlEnd != C_PKG_END) {
+	if (controlEnd != CTRL_PKG_END) {
 		printf("ERROR: Control field received (%d) is not END.\n", controlEnd);
 		return 0;
 	}
@@ -207,35 +211,34 @@ int receiveFile() {
 }
 
 int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
-	int bufSize = 1 + strlen(fileSize) + strlen(fileName);
-	char controlPackage[bufSize];
+	if (C == CTRL_PKG_START)
+		printf("Sending START control package.\n");
+	else if (C == CTRL_PKG_END)
+		printf("Sending END control package.\n");
+	else
+		printf("WARNING: Sending UNKNOWN control package (C = %d).\n", C);
 
-	controlPackage[0] = C;
+	int packageSize = 5 + strlen(fileSize) + strlen(fileName);
+	ui i = 0, pos = 0;
 
-	// file size
-	controlPackage[1] = 0;
-	controlPackage[2] = strlen(fileSize);
-
-	ui i = 0, pos = 3;
+	// creating control package
+	char controlPackage[packageSize];
+	controlPackage[pos++] = C;
+	controlPackage[pos++] = PARAM_FILE_SIZE;
+	controlPackage[pos++] = strlen(fileSize);
 	for (i = 0; i < strlen(fileSize); i++)
 		controlPackage[pos++] = fileSize[i];
-
-	// file name
-	controlPackage[pos++] = 1;
+	controlPackage[pos++] = PARAM_FILE_NAME;
 	controlPackage[pos++] = strlen(fileName);
-
 	for (i = 0; i < strlen(fileName); i++)
 		controlPackage[pos++] = fileName[i];
 
-	printf("File: %s\n", fileName);
-	printf("Size: %s (bytes)\n", fileSize);
+	if (C == CTRL_PKG_START) {
+		printf("File: %s\n", fileName);
+		printf("Size: %s (bytes)\n", fileSize);
+	}
 
-	if (C == 2)
-		printf("Sending START control package.\n");
-	if (C == 3)
-		printf("Sending END control package.\n");
-
-	if (!llwrite(fd, &controlPackage[0], bufSize)) {
+	if (!llwrite(fd, &controlPackage[0], packageSize)) {
 		printf(
 				"ERROR: Could not write to link layer while sending control package.\n");
 		free(controlPackage);
@@ -243,15 +246,17 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 		return 0;
 	}
 
-	if (C == 2)
+	if (C == CTRL_PKG_START)
 		printf("START control package sent.\n");
-	if (C == 3)
+	else if (C == CTRL_PKG_END)
 		printf("END control package sent.\n");
+	else
+		printf("WARNING: UNKNOWN control package sent (C = %d).\n", C);
 
 	return 1;
 }
 
-int receiveControlPackage(int fd, int* package, int* fileLength,
+int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 		char** fileName) {
 	char* receivedPackage;
 	ui totalSize = llread(fd, &receivedPackage);
@@ -261,8 +266,13 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 		return 0;
 	}
 
-	printf("A control package has been received.\n");
-	*package = receivedPackage[0];
+	*controlPackageType = receivedPackage[0];
+
+	if (*controlPackageType == CTRL_PKG_END) {
+		printf("END control package has been received.\n");
+		return 1;
+	} else
+		printf("START control package has been received.\n");
 
 	ui numParams = 2, pos = 1, numOcts = 0;
 
@@ -271,7 +281,7 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 		int paramType = receivedPackage[pos++];
 
 		switch (paramType) {
-		case FILE_SIZE: {
+		case PARAM_FILE_SIZE: {
 			numOcts = (ui) receivedPackage[pos++];
 
 			char* length = malloc(numOcts);
@@ -282,7 +292,7 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 
 			break;
 		}
-		case FILE_NAME:
+		case PARAM_FILE_NAME:
 			numOcts = (unsigned char) receivedPackage[pos++];
 			memcpy(*fileName, &receivedPackage[pos], numOcts);
 
@@ -294,7 +304,7 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 }
 
 int sendDataPackage(int fd, int sn, const char* buffer, int length) {
-	printf("Sending data package.\n");
+	// printf("Sending data package.\n");
 
 	int C = 1;
 	int N = sn;
@@ -320,7 +330,7 @@ int sendDataPackage(int fd, int sn, const char* buffer, int length) {
 
 	free(controlPackage);
 
-	printf("Successfully sent data package.\n");
+	// printf("Successfully sent data package.\n");
 
 	return 1;
 }

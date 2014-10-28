@@ -39,6 +39,7 @@ typedef struct {
 
 	// frame sequence number (0, 1)
 	ui sequenceNumber;
+	ui responseNumber;
 
 	// timeout value
 	ui timeout;
@@ -74,7 +75,7 @@ int sendCommand(int fd, Command command);
 Command getCommandWithControlField(ControlField controlField);
 ControlField getCommandControlField(char* commandStr, Command command);
 
-char* createMessage(const char* buf, ui bufSize, int sn);
+char* createMessage(const char* buf, ui bufSize);
 int sendMessage(int fd, const char* buf, ui bufSize);
 
 Message* receive(int fd);

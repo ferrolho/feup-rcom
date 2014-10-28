@@ -27,6 +27,7 @@ int initLinkLayer(const char* port, ConnnectionMode mode) {
 	ll->mode = mode;
 	ll->baudRate = BAUDRATE;
 	ll->sequenceNumber = 0;
+	ll->responseNumber = 1;
 	ll->timeout = 3;
 	ll->numTries = 4;
 
@@ -204,6 +205,7 @@ int llwrite(int fd, const char* buf, ui bufSize) {
 		Message* receivedMessage = receive(fd);
 
 		if (messageIsCommand(receivedMessage, RR)) {
+			ll->sequenceNumber = !ll->sequenceNumber;
 			stopAlarm();
 			transferring = 0;
 		} else if (messageIsCommand(receivedMessage, REJ)) {
@@ -237,7 +239,7 @@ int llread(int fd, char** message) {
 			memcpy(*message, msg->message, msg->messageSize);
 			free(msg->message);
 
-			ll->sequenceNumber = !ll->sequenceNumber;
+			ll->responseNumber = !ll->sequenceNumber;
 			sendCommand(fd, RR);
 
 			done = 1;
@@ -397,21 +399,18 @@ const int DEBUG_STATE_MACHINE = 0;
 
 const int MSG_SIZE = 6 * sizeof(char);
 
-char* createMessage(const char* buf, ui bufSize, int sn) {
-	char* msg = malloc(MSG_SIZE + bufSize);
-
-	msg[0] = FLAG;
-	msg[1] = A;
-	msg[2] = sn << 1;
-	msg[3] = msg[1] ^ msg[2];
-
-	memcpy(&msg[4], buf, bufSize);
-
+char* createMessage(const char* buf, ui bufSize) {
 	char BCC = 0;
 	int i;
 	for (i = 0; i < bufSize; i++)
 		BCC ^= buf[i];
 
+	char* msg = malloc(MSG_SIZE + bufSize);
+	msg[0] = FLAG;
+	msg[1] = A;
+	msg[2] = ll->sequenceNumber;
+	msg[3] = msg[1] ^ msg[2];
+	memcpy(&msg[4], buf, bufSize);
 	msg[4 + bufSize] = BCC;
 	msg[5 + bufSize] = FLAG;
 
@@ -419,7 +418,7 @@ char* createMessage(const char* buf, ui bufSize, int sn) {
 }
 
 int sendMessage(int fd, const char* buf, ui bufSize) {
-	char* msg = createMessage(buf, bufSize, ll->sequenceNumber);
+	char* msg = createMessage(buf, bufSize);
 	bufSize += MSG_SIZE;
 
 	bufSize = stuff(&msg, bufSize);
@@ -560,7 +559,8 @@ Message* receive(int fd) {
 
 		char commandStr[MAX_SIZE];
 		getCommandControlField(commandStr, msg->command);
-		printf("RECEIVED: %s\n", commandStr);
+
+		// printf("RECEIVED: %s\n", commandStr);
 	} else if (msg->type == DATA) {
 		msg->messageSize = bufSize;
 		msg->message = malloc(msg->messageSize);

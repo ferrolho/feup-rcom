@@ -201,10 +201,14 @@ int llwrite(int fd, const char* buf, ui bufSize) {
 				setAlarm();
 		}
 
-		if (messageIsCommand(receive(fd), RR)) {
-			transferring = 0;
+		Message* receivedMessage = receive(fd);
 
-			printf("*** Successfully established a connection. ***\n");
+		if (messageIsCommand(receivedMessage, RR)) {
+			stopAlarm();
+			transferring = 0;
+		} else if (messageIsCommand(receivedMessage, REJ)) {
+			stopAlarm();
+			try = 0;
 		}
 	}
 
@@ -340,7 +344,7 @@ int sendCommand(int fd, Command command) {
 
 	if (write(fd, buf, bufSize * sizeof(*buf))) {
 		printf("SENT: %s\n", commandStr);
-		printBuf(buf);
+		// printBuf(buf);
 
 		return 1;
 	} else
@@ -527,19 +531,20 @@ Message* receive(int fd) {
 
 				if (DEBUG_STATE_MACHINE)
 					printf("BCC_OK: FLAG received. Going to STOP.\n");
-			} else if (c != FLAG && msg->type == INVALID) {
-				msg->type = DATA;
+			} else if (c != FLAG) {
+				if (msg->type == COMMAND) {
+					state = START;
+					continue;
+				} else if (msg->type == INVALID)
+					msg->type = DATA;
 
-				buf[bufSize++] = c;
-			} else if (c != FLAG && msg->type == DATA) {
 				if (bufSize % FRAME_SIZE == 0) {
-					int mult = bufSize / FRAME_SIZE + 1;
-					buf = (unsigned char*) realloc(buf, mult * FRAME_SIZE);
+					int m = bufSize / FRAME_SIZE + 1;
+					buf = (unsigned char*) realloc(buf, m * FRAME_SIZE);
 				}
 
 				buf[bufSize++] = c;
-			} else
-				state = START;
+			}
 			break;
 		case STOP:
 			buf[bufSize] = 0;
@@ -556,13 +561,13 @@ Message* receive(int fd) {
 		char commandStr[MAX_SIZE];
 		getCommandControlField(commandStr, msg->command);
 		printf("RECEIVED: %s\n", commandStr);
+	} else if (msg->type == DATA) {
+		msg->messageSize = bufSize;
+		msg->message = malloc(msg->messageSize);
+		memcpy(msg->message, &buf[4], msg->messageSize);
 	}
 
-	msg->messageSize = bufSize;
-	msg->message = malloc(msg->messageSize);
-	memcpy(msg->message, &buf[4], msg->messageSize);
-
-	printBuf(buf);
+	// printBuf(buf);
 	free(buf);
 
 	return msg;
@@ -574,8 +579,8 @@ int messageIsCommand(Message* msg, Command command) {
 
 ui stuff(char** buf, ui bufSize) {
 	ui newBufSize = bufSize;
-	int i;
 
+	int i;
 	for (i = 1; i < bufSize - 1; i++)
 		if ((*buf)[i] == FLAG || (*buf)[i] == ESCAPE)
 			newBufSize++;

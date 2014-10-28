@@ -15,8 +15,8 @@
 #define FILE_SIZE 0
 #define FILE_NAME 1
 
-int C_PKG_START = 2;
-int C_PKG_END = 3;
+const int C_PKG_START = 2;
+const int C_PKG_END = 3;
 
 ApplicationLayer* al;
 
@@ -66,7 +66,8 @@ int sendFile() {
 	if (!file) {
 		printf("ERROR: Could not open file to be sent.\n");
 		return 0;
-	}
+	} else
+		printf("Successfully opened file to be sent.\n");
 
 	int fd = llopen(ll->mode);
 	if (fd <= 0)
@@ -86,14 +87,13 @@ int sendFile() {
 		return 0;
 	}
 
-	printf("Start control package sent.\n");
-
 	char* buf = malloc(MAX_SIZE);
 	ui readBytes = 0, writtenBytes = 0;
 
 	int i = 0;
-	while ((readBytes = fread(buf, sizeof(char), MAX_SIZE, file)) != 0) {
-		printf("Reading file chunk.\n");
+	while ((readBytes = fread(buf, sizeof(char), MAX_SIZE, file)) > 0) {
+		printf("Read file chunk size: %d (bytes).\n", readBytes);
+
 		if (!sendDataPackage(fd, (i++) % 255, buf, readBytes)) {
 			printf("ERROR: Data package could not be sent.\n");
 			free(buf);
@@ -101,15 +101,14 @@ int sendFile() {
 		}
 
 		writtenBytes += readBytes;
-
 		buf = memset(buf, 0, MAX_SIZE);
 
-		printf("\rProgress: %3d%%",
-				(int) (writtenBytes / (float) fileSize * 100));
-		fflush(stdout);
+		int transferredPercentage = 100.0 * writtenBytes / fileSize;
+		printf("Completed: %03d%%\n", transferredPercentage);
+		// fflush(stdout);
 	}
-	printf("\n");
 
+	printf("*** File successfully transferred. ***\n");
 	free(buf);
 
 	if (fclose(file) != 0) {
@@ -244,6 +243,11 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 		return 0;
 	}
 
+	if (C == 2)
+		printf("START control package sent.\n");
+	if (C == 3)
+		printf("END control package sent.\n");
+
 	return 1;
 }
 
@@ -257,7 +261,7 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 		return 0;
 	}
 
-	printf("Received a control package.\n");
+	printf("A control package has been received.\n");
 	*package = receivedPackage[0];
 
 	ui numParams = 2, pos = 1, numOcts = 0;
@@ -290,16 +294,18 @@ int receiveControlPackage(int fd, int* package, int* fileLength,
 }
 
 int sendDataPackage(int fd, int sn, const char* buffer, int length) {
+	printf("Sending data package.\n");
+
 	int C = 1;
+	int N = sn;
 	int L2 = length / 256;
 	int L1 = length % 256;
 
-	ui packageSize = 4 + (L2 + L1);
-
+	ui packageSize = 4 + length;
 	char* controlPackage = (char*) malloc(packageSize);
 
 	controlPackage[0] = C;
-	controlPackage[1] = sn;
+	controlPackage[1] = N;
 	controlPackage[2] = L2;
 	controlPackage[3] = L1;
 	memcpy(&controlPackage[4], buffer, length);
@@ -313,6 +319,8 @@ int sendDataPackage(int fd, int sn, const char* buffer, int length) {
 	}
 
 	free(controlPackage);
+
+	printf("Successfully sent data package.\n");
 
 	return 1;
 }

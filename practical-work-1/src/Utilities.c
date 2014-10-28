@@ -1,10 +1,21 @@
 #include "Utilities.h"
 
 int getFileSize(FILE* file) {
-	if (fseek(file, 0L, SEEK_END) == -1) {
+	// saving current position
+	long int currentPosition = ftell(file);
+
+	// seeking end of file
+	if (fseek(file, 0, SEEK_END) == -1) {
 		printf("ERROR: Could not get file size.\n");
 		return -1;
 	}
 
-	return ftell(file);
+	// saving file size
+	long int size = ftell(file);
+
+	// seeking to the previously saved position
+	fseek(file, 0, currentPosition);
+
+	// returning size
+	return size;
 }

@@ -20,11 +20,19 @@ typedef enum {
 	COMMAND, DATA, INVALID
 } MessageType;
 
+typedef enum {
+	COMMAND_SIZE = 5 * sizeof(char), MESSAGE_SIZE = 6 * sizeof(char)
+} MessageSize;
+
 typedef struct {
 	MessageType type;
+
 	Command command;
+
 	unsigned char* message;
 	ui messageSize;
+
+	int nr;
 } Message;
 
 typedef struct {
@@ -38,8 +46,7 @@ typedef struct {
 	int baudRate;
 
 	// frame sequence number (0, 1)
-	ui sequenceNumber;
-	ui responseNumber;
+	ui ns;
 
 	// timeout value
 	ui timeout;
@@ -70,7 +77,7 @@ int llwrite(int fd, const char* buf, ui bufSize);
 int llread(int fd, char** message);
 int llclose(int fd, ConnnectionMode mode);
 
-void createCommand(ControlField C, unsigned char* buf, ui bufSize);
+char* createCommand(ControlField C);
 int sendCommand(int fd, Command command);
 Command getCommandWithControlField(ControlField controlField);
 ControlField getCommandControlField(char* commandStr, Command command);
@@ -78,7 +85,7 @@ ControlField getCommandControlField(char* commandStr, Command command);
 char* createMessage(const char* buf, ui bufSize);
 int sendMessage(int fd, const char* buf, ui bufSize);
 
-Message* receive(int fd);
+Message* receiveMessage(int fd);
 int messageIsCommand(Message* msg, Command command);
 
 ui stuff(char** buf, ui bufSize);

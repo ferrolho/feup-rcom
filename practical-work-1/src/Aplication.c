@@ -58,6 +58,7 @@ int startConnection() {
 }
 
 int sendFile() {
+	// open file to be sent
 	FILE* file = fopen(al->fileName, "rb");
 	if (!file) {
 		printf("ERROR: Could not open file to be sent.\n");
@@ -65,62 +66,58 @@ int sendFile() {
 	} else
 		printf("Successfully opened file to be sent.\n");
 
+	// open connection
 	int fd = llopen(ll->mode);
 	if (fd <= 0)
 		return 0;
 
+	// get size of file to be sent
 	int fileSize = getFileSize(file);
-	if (fileSize == -1) {
-		printf("ERROR: Could not get size of file to be sent.\n");
-		return 0;
-	}
-
 	char fileSizeBuf[sizeof(int) * 3 + 2];
 	snprintf(fileSizeBuf, sizeof fileSizeBuf, "%d", fileSize);
 
-	if (!sendControlPackage(al->fd, CTRL_PKG_START, fileSizeBuf,
-			al->fileName)) {
-		printf("ERROR: Control package could not be sent.\n");
+	// send start control package
+	if (!sendControlPackage(al->fd, CTRL_PKG_START, fileSizeBuf, al->fileName))
 		return 0;
-	}
 
-	char* buf = malloc(MAX_SIZE);
-	ui readBytes = 0, writtenBytes = 0;
+	// allocate space for file buffer
+	char* fileBuf = malloc(MAX_SIZE);
 
-	while ((readBytes = fread(buf, sizeof(char), MAX_SIZE, file)) > 0) {
-		// printf("Read file chunk size: %d (bytes).\n", readBytes);
-
-		if (!sendDataPackage(fd, ll->sequenceNumber, buf, readBytes)) {
-			printf("ERROR: Data package could not be sent.\n");
-			free(buf);
+	// read file chunks
+	ui readBytes = 0, writtenBytes = 0, i = 0;
+	while ((readBytes = fread(fileBuf, sizeof(char), MAX_SIZE, file)) > 0) {
+		// send those chunks inside data packages
+		if (!sendDataPackage(fd, (i++) % 255, fileBuf, readBytes)) {
+			free(fileBuf);
 			return 0;
 		}
 
-		writtenBytes += readBytes;
-		buf = memset(buf, 0, MAX_SIZE);
+		// reset file buffer
+		fileBuf = memset(fileBuf, 0, MAX_SIZE);
 
-		int transferredPercentage = 100.0 * writtenBytes / fileSize;
-		printf("\rCompleted: %03d%%", transferredPercentage);
-		fflush(stdout);
+		// increment no. of written bytes
+		writtenBytes += readBytes;
+
+		/*
+		 float transferredPercentage = 100.0 * writtenBytes / fileSize;
+		 printf("\rCompleted: %03.2f%%", transferredPercentage);
+		 fflush(stdout);
+		 */
 	}
 	printf("\n");
 
-	free(buf);
-
-	if (!sendControlPackage(fd, CTRL_PKG_END, "0", "")) {
-		printf("ERROR: Could not sent Control package.\n");
-		return 0;
-	}
-
-	if (!llclose(al->fd, ll->mode)) {
-		printf("ERROR: Serial port was not closed.\n");
-		return 0;
-	}
+	free(fileBuf);
 
 	if (fclose(file) != 0) {
 		printf("ERROR: Unable to close file.\n");
 		return 0;
 	}
+
+	if (!sendControlPackage(fd, CTRL_PKG_END, "0", ""))
+		return 0;
+
+	if (!llclose(al->fd, ll->mode))
+		return 0;
 
 	printf("*** File successfully transferred. ***\n");
 
@@ -136,10 +133,9 @@ int receiveFile() {
 	int controlStart, fileSize;
 	char* fileName;
 
-	if (!receiveControlPackage(al->fd, &controlStart, &fileSize, &fileName)) {
-		printf("ERROR: Could not receive START control package.\n");
+	printf("Waiting for START control package.\n");
+	if (!receiveControlPackage(al->fd, &controlStart, &fileSize, &fileName))
 		return 0;
-	}
 
 	if (controlStart != CTRL_PKG_START) {
 		printf(
@@ -148,6 +144,7 @@ int receiveFile() {
 		return 0;
 	}
 
+	// create output file
 	FILE* outputFile = fopen(al->fileName, "wb");
 	if (outputFile == NULL) {
 		printf("ERROR: Could not create output file.\n");
@@ -157,48 +154,57 @@ int receiveFile() {
 	printf("Successfully created output file: %s.\n", al->fileName);
 	printf("Size of the file to be received: %d (bytes).\n", fileSize);
 
-	int fileSizeReadSoFar = 0;
-	int sn = -1;
-
+	printf("Starting to receive file data.\n");
+	int fileSizeReadSoFar = 0, N = -1;
 	while (fileSizeReadSoFar != fileSize) {
-		char* buf = (char*) calloc(0, sizeof(char));
-
+		int lastN = N;
+		char* fileBuf = NULL;
 		int length = 0;
-		int lastSn = sn;
 
-		if (!receiveDataPackage(al->fd, &sn, &buf, &length)) {
+		// receive data package with chunk and put chunk in fileBuf
+		if (!receiveDataPackage(al->fd, &N, &fileBuf, &length)) {
 			printf("ERROR: Could not receive data package.\n");
-			free(buf);
+			free(fileBuf);
 			return 0;
 		}
 
-		if (sn != 0 && sn != 1 && lastSn != !sn) {
-			printf("ERROR: Received sequence no. was %d instead of %d.\n", sn,
-					!lastSn);
-			free(buf);
+		if (N != 0 && lastN + 1 != N) {
+			printf("ERROR: Received sequence no. was %d instead of %d.\n", N,
+					lastN + 1);
+			free(fileBuf);
 			return 0;
 		}
 
+		// write received chunk to output file
+		fwrite(fileBuf, sizeof(char), length, outputFile);
+		free(fileBuf);
+
+		// increment no. of read bytes
 		fileSizeReadSoFar += length;
-		fwrite(buf, sizeof(char), length, outputFile);
-		free(buf);
+
+		/*
+		 float transferredPercentage = 100.0 * fileSizeReadSoFar / fileSize;
+		 printf("\rCompleted: %03.2f%%", transferredPercentage);
+		 fflush(stdout);
+		 */
 	}
 
-	printf("*** File successfully received. ***\n");
-
+	// close output file
 	if (fclose(outputFile) != 0) {
 		printf("ERROR: Closing output file.\n");
 		return -1;
 	}
 
-	int controlEnd;
-	if (!receiveControlPackage(al->fd, &controlEnd, 0, NULL)) {
-		printf("ERROR: Received control package end.\n");
+	// receive end control package
+	int controlPackageTypeReceived = -1;
+	if (!receiveControlPackage(al->fd, &controlPackageTypeReceived, 0, NULL)) {
+		printf("ERROR: Could not receive END control package.\n");
 		return 0;
 	}
 
-	if (controlEnd != CTRL_PKG_END) {
-		printf("ERROR: Control field received (%d) is not END.\n", controlEnd);
+	if (controlPackageTypeReceived != CTRL_PKG_END) {
+		printf("ERROR: Control field received (%d) is not END.\n",
+				controlPackageTypeReceived);
 		return 0;
 	}
 
@@ -206,6 +212,8 @@ int receiveFile() {
 		printf("ERROR: Serial port was not closed.\n");
 		return 0;
 	}
+
+	printf("*** File successfully received. ***\n");
 
 	return 1;
 }
@@ -218,10 +226,11 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 	else
 		printf("WARNING: Sending UNKNOWN control package (C = %d).\n", C);
 
+	// calculate control package size
 	int packageSize = 5 + strlen(fileSize) + strlen(fileName);
 	ui i = 0, pos = 0;
 
-	// creating control package
+	// create control package
 	char controlPackage[packageSize];
 	controlPackage[pos++] = C;
 	controlPackage[pos++] = PARAM_FILE_SIZE;
@@ -238,7 +247,8 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 		printf("Size: %s (bytes)\n", fileSize);
 	}
 
-	if (!llwrite(fd, &controlPackage[0], packageSize)) {
+	// send control package
+	if (!llwrite(fd, controlPackage, packageSize)) {
 		printf(
 				"ERROR: Could not write to link layer while sending control package.\n");
 		free(controlPackage);
@@ -258,34 +268,33 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 
 int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 		char** fileName) {
-	char* receivedPackage;
-	ui totalSize = llread(fd, &receivedPackage);
+	// receive control package
+	char* package;
+	ui totalSize = llread(fd, &package);
 	if (totalSize < 0) {
 		printf(
 				"ERROR: Could not read from link layer while receiving control package.\n");
 		return 0;
 	}
 
-	*controlPackageType = receivedPackage[0];
-
+	// process control package type
+	*controlPackageType = package[0];
 	if (*controlPackageType == CTRL_PKG_END) {
 		printf("END control package has been received.\n");
 		return 1;
 	} else
 		printf("START control package has been received.\n");
 
-	ui numParams = 2, pos = 1, numOcts = 0;
-
-	unsigned int i;
+	ui i = 0, numParams = 2, pos = 1, numOcts = 0;
 	for (i = 0; i < numParams; i++) {
-		int paramType = receivedPackage[pos++];
+		int paramType = package[pos++];
 
 		switch (paramType) {
 		case PARAM_FILE_SIZE: {
-			numOcts = (ui) receivedPackage[pos++];
+			numOcts = (ui) package[pos++];
 
 			char* length = malloc(numOcts);
-			memcpy(length, &receivedPackage[pos], numOcts);
+			memcpy(length, &package[pos], numOcts);
 
 			*fileLength = atoi(length);
 			free(length);
@@ -293,8 +302,8 @@ int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 			break;
 		}
 		case PARAM_FILE_NAME:
-			numOcts = (unsigned char) receivedPackage[pos++];
-			memcpy(*fileName, &receivedPackage[pos], numOcts);
+			numOcts = (unsigned char) package[pos++];
+			memcpy(*fileName, &package[pos], numOcts);
 
 			break;
 		}
@@ -303,65 +312,73 @@ int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 	return 1;
 }
 
-int sendDataPackage(int fd, int sn, const char* buffer, int length) {
-	// printf("Sending data package.\n");
-
-	int C = 1;
-	int N = sn;
+int sendDataPackage(int fd, int N, const char* buffer, int length) {
+	int C = CTRL_PKG_DATA;
 	int L2 = length / 256;
 	int L1 = length % 256;
 
+	// calculate package size
 	ui packageSize = 4 + length;
-	char* controlPackage = (char*) malloc(packageSize);
 
-	controlPackage[0] = C;
-	controlPackage[1] = N;
-	controlPackage[2] = L2;
-	controlPackage[3] = L1;
-	memcpy(&controlPackage[4], buffer, length);
+	// allocate space for package header and file chunk
+	char* package = (char*) malloc(packageSize);
 
-	if (!llwrite(fd, controlPackage, packageSize)) {
+	// build package header
+	package[0] = C;
+	package[1] = N;
+	package[2] = L2;
+	package[3] = L1;
+
+	// copy file chunk to package
+	memcpy(&package[4], buffer, length);
+
+	// write package
+	if (!llwrite(fd, package, packageSize)) {
 		printf(
 				"ERROR: Could not write to link layer while sending data package.\n");
-		free(controlPackage);
+		free(package);
 
 		return 0;
 	}
 
-	free(controlPackage);
-
-	// printf("Successfully sent data package.\n");
+	free(package);
 
 	return 1;
 }
 
-int receiveDataPackage(int fd, int* sn, char** buf, int* length) {
-	char* receivedPackage;
-	ui size = llread(fd, &receivedPackage);
+int receiveDataPackage(int fd, int* N, char** buf, int* length) {
+	char* package;
+
+	// read package from link layer
+	ui size = llread(fd, &package);
 	if (size < 0) {
 		printf(
 				"ERROR: Could not read from link layer while receiving data package.\n");
 		return 0;
 	}
 
-	if (receivedPackage[0] != 1) {
-		printf("ERROR: Received package is not a data package (C = %d).\n",
-				receivedPackage[0]);
+	int C = package[0];
+	*N = (unsigned char) package[1];
+	int L2 = package[2];
+	int L1 = package[3];
+
+	// assert package is a data package
+	if (C != CTRL_PKG_DATA) {
+		printf("ERROR: Received package is not a data package (C = %d).\n", C);
 		return 0;
 	}
 
-	int seqNumber = (unsigned char) receivedPackage[1];
+	// calculate size of the file chunk contained in the read package
+	*length = 256 * L2 + L1;
 
-	int bufSize = 256 * (unsigned char) receivedPackage[2]
-			+ (unsigned char) receivedPackage[3];
+	// allocate space for that file chunk
+	*buf = malloc(*length);
 
-	*buf = malloc(bufSize);
-	memcpy(*buf, &receivedPackage[4], bufSize);
+	// copy file chunk to the buffer
+	memcpy(*buf, &package[4], *length);
 
-	free(receivedPackage);
-
-	*sn = seqNumber;
-	*length = bufSize;
+	// destroy the received package
+	free(package);
 
 	return 1;
 }

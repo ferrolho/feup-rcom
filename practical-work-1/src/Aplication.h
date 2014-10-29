@@ -26,5 +26,5 @@ int receiveFile();
 int sendControlPackage(int fd, int C, char* fileSize, char* fileName);
 int receiveControlPackage(int fd, int* ctrl, int* fileLength, char** fileName);
 
-int sendDataPackage(int fd, int sn, const char* buf, int length);
-int receiveDataPackage(int fd, int* sn, char** buf, int* length);
+int sendDataPackage(int fd, int N, const char* buf, int length);
+int receiveDataPackage(int fd, int* N, char** buf, int* length);

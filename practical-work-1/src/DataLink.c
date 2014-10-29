@@ -1,13 +1,13 @@
 #include "DataLink.h"
 
 #include <fcntl.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "Alarm.h"
 #include "Aplication.h"
 
 const int FALSE = 0;
@@ -26,8 +26,7 @@ int initLinkLayer(const char* port, ConnnectionMode mode) {
 	strcpy(ll->port, port);
 	ll->mode = mode;
 	ll->baudRate = BAUDRATE;
-	ll->sequenceNumber = 0;
-	ll->responseNumber = 1;
+	ll->ns = 0;
 	ll->timeout = 3;
 	ll->numTries = 4;
 
@@ -104,30 +103,6 @@ int closeSerialPort() {
 	return 1;
 }
 
-int alarmWentOff;
-
-void alarmHandler(int signal) {
-	if (signal != SIGALRM)
-		return;
-
-	alarmWentOff = 1;
-	printf("Connection time out!\n\nRetrying:\n");
-
-	alarm(ll->timeout);
-}
-
-void setAlarm() {
-	signal(SIGALRM, alarmHandler);
-
-	alarmWentOff = 0;
-
-	alarm(ll->timeout);
-}
-
-void stopAlarm() {
-	alarm(0);
-}
-
 int llopen(ConnnectionMode mode) {
 	printf("*** Trying to establish a connection. ***\n");
 
@@ -152,7 +127,7 @@ int llopen(ConnnectionMode mode) {
 					setAlarm();
 			}
 
-			if (messageIsCommand(receive(al->fd), UA)) {
+			if (messageIsCommand(receiveMessage(al->fd), UA)) {
 				connected = 1;
 
 				printf("*** Successfully established a connection. ***\n");
@@ -165,7 +140,7 @@ int llopen(ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		while (!connected) {
-			if (messageIsCommand(receive(al->fd), SET)) {
+			if (messageIsCommand(receiveMessage(al->fd), SET)) {
 				sendCommand(al->fd, UA);
 				connected = 1;
 
@@ -202,10 +177,14 @@ int llwrite(int fd, const char* buf, ui bufSize) {
 				setAlarm();
 		}
 
-		Message* receivedMessage = receive(fd);
+		Message* receivedMessage = receiveMessage(fd);
 
 		if (messageIsCommand(receivedMessage, RR)) {
-			ll->sequenceNumber = !ll->sequenceNumber;
+//			printf("ll->ns: %d; Received RR with nr: %d\n", ll->ns,
+//					receivedMessage->nr);
+//
+//			ll->ns = receivedMessage->nr;
+
 			stopAlarm();
 			transferring = 0;
 		} else if (messageIsCommand(receivedMessage, REJ)) {
@@ -224,25 +203,33 @@ int llread(int fd, char** message) {
 
 	int done = 0;
 	while (!done) {
-		msg = receive(fd);
+		msg = receiveMessage(fd);
 
 		switch (msg->type) {
 		case INVALID:
-			sendCommand(fd, C_REJ);
+			printf("INVALID message received.\n");
+			ll->ns = !msg->nr;
+			sendCommand(fd, REJ);
 			break;
 		case COMMAND:
+			// printf("COMMAND message received.\n");
+
 			if (msg->command == DISC)
 				done = 1;
 			break;
 		case DATA:
-			*message = malloc(msg->messageSize);
-			memcpy(*message, msg->message, msg->messageSize);
-			free(msg->message);
+			// printf("DATA message received.\n");
 
-			ll->responseNumber = !ll->sequenceNumber;
-			sendCommand(fd, RR);
+			if (msg->nr != ll->ns) {
+				*message = malloc(msg->messageSize);
+				memcpy(*message, msg->message, msg->messageSize);
+				free(msg->message);
 
-			done = 1;
+				sendCommand(fd, RR);
+
+				done = 1;
+			} else
+				printf("\tBad Nr associated, ignoring message.\n");
 
 			break;
 		}
@@ -275,7 +262,7 @@ int llclose(int fd, ConnnectionMode mode) {
 					setAlarm();
 			}
 
-			if (messageIsCommand(receive(fd), DISC))
+			if (messageIsCommand(receiveMessage(fd), DISC))
 				disconnected = 1;
 		}
 
@@ -289,7 +276,7 @@ int llclose(int fd, ConnnectionMode mode) {
 	}
 	case RECEIVE: {
 		while (!disconnected) {
-			if (messageIsCommand(receive(fd), DISC))
+			if (messageIsCommand(receiveMessage(fd), DISC))
 				disconnected = 1;
 		}
 
@@ -310,7 +297,7 @@ int llclose(int fd, ConnnectionMode mode) {
 					setAlarm();
 			}
 
-			if (messageIsCommand(receive(fd), UA))
+			if (messageIsCommand(receiveMessage(fd), UA))
 				uaReceived = 1;
 		}
 
@@ -326,33 +313,36 @@ int llclose(int fd, ConnnectionMode mode) {
 	return 0;
 }
 
-void createCommand(ControlField C, unsigned char* buf, ui bufSize) {
-	cleanBuf(buf, bufSize);
+char* createCommand(ControlField C) {
+	char* command = malloc(COMMAND_SIZE);
 
-	buf[0] = FLAG;
-	buf[1] = A;
-	buf[2] = C;
-	buf[3] = buf[1] ^ buf[2];
-	buf[4] = FLAG;
+	command[0] = FLAG;
+	command[1] = A;
+	command[2] = C;
+	if (C == C_REJ || C == C_RR)
+		command[2] |= (ll->ns << 7);
+	command[3] = command[1] ^ command[2];
+	command[4] = FLAG;
+
+	return command;
 }
 
 int sendCommand(int fd, Command command) {
 	char commandStr[MAX_SIZE];
 	ControlField ctrlField = getCommandControlField(commandStr, command);
 
-	ui bufSize = 5;
-	unsigned char buf[bufSize];
-	createCommand(ctrlField, buf, bufSize);
+	char* commandBuf = createCommand(ctrlField);
+	ui commandBufSize = stuff(&commandBuf, COMMAND_SIZE);
 
-	if (write(fd, buf, bufSize * sizeof(*buf))) {
-		printf("SENT: %s\n", commandStr);
-		// printBuf(buf);
-
-		return 1;
-	} else
+	int successfullySentCommand = TRUE;
+	if (write(fd, commandBuf, commandBufSize) != COMMAND_SIZE) {
 		printf("ERROR: Could not write %s command.\n", commandStr);
+		successfullySentCommand = FALSE;
+	}
 
-	return 0;
+	free(commandBuf);
+
+	return successfullySentCommand;
 }
 
 Command getCommandWithControlField(ControlField controlField) {
@@ -397,18 +387,16 @@ ControlField getCommandControlField(char* commandStr, Command command) {
 
 const int DEBUG_STATE_MACHINE = 0;
 
-const int MSG_SIZE = 6 * sizeof(char);
-
 char* createMessage(const char* buf, ui bufSize) {
 	char BCC = 0;
 	int i;
 	for (i = 0; i < bufSize; i++)
 		BCC ^= buf[i];
 
-	char* msg = malloc(MSG_SIZE + bufSize);
+	char* msg = malloc(MESSAGE_SIZE + bufSize);
 	msg[0] = FLAG;
 	msg[1] = A;
-	msg[2] = ll->sequenceNumber;
+	msg[2] = ll->ns << 6;
 	msg[3] = msg[1] ^ msg[2];
 	memcpy(&msg[4], buf, bufSize);
 	msg[4 + bufSize] = BCC;
@@ -419,7 +407,7 @@ char* createMessage(const char* buf, ui bufSize) {
 
 int sendMessage(int fd, const char* buf, ui bufSize) {
 	char* msg = createMessage(buf, bufSize);
-	bufSize += MSG_SIZE;
+	bufSize += MESSAGE_SIZE;
 
 	bufSize = stuff(&msg, bufSize);
 
@@ -434,12 +422,12 @@ int sendMessage(int fd, const char* buf, ui bufSize) {
 
 #define FRAME_SIZE 256
 
-Message* receive(int fd) {
+Message* receiveMessage(int fd) {
 	Message* msg = (Message*) malloc(sizeof(Message));
 	msg->type = INVALID;
 
 	ui bufSize = 0;
-	unsigned char* buf = malloc(FRAME_SIZE);
+	char* buf = malloc(FRAME_SIZE);
 
 	State state = START;
 
@@ -457,7 +445,7 @@ Message* receive(int fd) {
 			}
 
 			if (!numReadBytes) {
-				// printf("ERROR: nothing received.\n");
+				printf("ERROR: nothing received.\n");
 				msg->type = INVALID;
 				return msg;
 			}
@@ -539,7 +527,7 @@ Message* receive(int fd) {
 
 				if (bufSize % FRAME_SIZE == 0) {
 					int m = bufSize / FRAME_SIZE + 1;
-					buf = (unsigned char*) realloc(buf, m * FRAME_SIZE);
+					buf = (char*) realloc(buf, m * FRAME_SIZE);
 				}
 
 				buf[bufSize++] = c;
@@ -554,15 +542,35 @@ Message* receive(int fd) {
 		}
 	}
 
+	bufSize = destuff(&buf, bufSize);
+
 	if (msg->type == COMMAND) {
 		msg->command = getCommandWithControlField(buf[2]);
 
 		char commandStr[MAX_SIZE];
-		getCommandControlField(commandStr, msg->command);
+		ControlField controlField = getCommandControlField(commandStr,
+				msg->command);
 
-		// printf("RECEIVED: %s\n", commandStr);
+		if (msg->command == RR || msg->command == REJ) {
+			msg->nr = (controlField >> 7) & BIT(1);
+
+			if (msg->nr != ll->ns)
+				ll->ns = msg->nr;
+			else
+				printf("@@@ nr was the same as ns\n");
+		}
+
+		printf("RECEIVED: %s; control field: %02x; with nr: %d\n", commandStr,
+				controlField, msg->nr);
 	} else if (msg->type == DATA) {
-		msg->messageSize = bufSize;
+		msg->nr = (buf[2] >> 6) & BIT(1);
+
+		if (msg->nr == ll->ns)
+			msg->nr = !msg->nr;
+		else
+			printf("@@@ ns received was NOT the same as ns sent");
+
+		msg->messageSize = bufSize - MESSAGE_SIZE;
 		msg->message = malloc(msg->messageSize);
 		memcpy(msg->message, &buf[4], msg->messageSize);
 	}

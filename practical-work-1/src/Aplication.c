@@ -98,11 +98,9 @@ int sendFile() {
 		// increment no. of written bytes
 		writtenBytes += readBytes;
 
-		/*
-		 float transferredPercentage = 100.0 * writtenBytes / fileSize;
-		 printf("\rCompleted: %03.2f%%", transferredPercentage);
-		 fflush(stdout);
-		 */
+		float transferredPercentage = 100.0 * writtenBytes / fileSize;
+		printf("\rCompleted: %03.2f%%", transferredPercentage);
+		fflush(stdout);
 	}
 	printf("\n");
 
@@ -182,12 +180,11 @@ int receiveFile() {
 		// increment no. of read bytes
 		fileSizeReadSoFar += length;
 
-		/*
-		 float transferredPercentage = 100.0 * fileSizeReadSoFar / fileSize;
-		 printf("\rCompleted: %03.2f%%", transferredPercentage);
-		 fflush(stdout);
-		 */
+		float transferredPercentage = 100.0 * fileSizeReadSoFar / fileSize;
+		printf("\rCompleted: %03.2f%%", transferredPercentage);
+		fflush(stdout);
 	}
+	printf("\n");
 
 	// close output file
 	if (fclose(outputFile) != 0) {

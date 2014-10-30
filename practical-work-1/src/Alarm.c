@@ -11,20 +11,32 @@ void alarmHandler(int signal) {
 	if (signal != SIGALRM)
 		return;
 
-	alarmWentOff = 1;
+	alarmWentOff = TRUE;
 	printf("Connection time out!\n\nRetrying:\n");
 
 	alarm(ll->timeout);
 }
 
 void setAlarm() {
-	signal(SIGALRM, alarmHandler);
+	struct sigaction action;
+	action.sa_handler = alarmHandler;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
 
-	alarmWentOff = 0;
+	sigaction(SIGALRM, &action, NULL);
+
+	alarmWentOff = FALSE;
 
 	alarm(ll->timeout);
 }
 
 void stopAlarm() {
+	struct sigaction action;
+	action.sa_handler = NULL;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+
+	sigaction(SIGALRM, &action, NULL);
+
 	alarm(0);
 }

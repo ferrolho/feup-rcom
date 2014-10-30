@@ -10,15 +10,16 @@
 #include "Alarm.h"
 #include "Aplication.h"
 
-const int FALSE = 0;
-const int TRUE = 1;
-
 const int BAUDRATE = B38400;
 const int FLAG = 0x7E;
 const int A = 0x03;
 const int ESCAPE = 0x7D;
 
 LinkLayer* ll;
+
+// TODO change this
+int numRetries = 3;
+#define MAX_FRAME_SIZE 256
 
 int initLinkLayer(const char* port, ConnnectionMode mode) {
 	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
@@ -28,7 +29,7 @@ int initLinkLayer(const char* port, ConnnectionMode mode) {
 	ll->baudRate = BAUDRATE;
 	ll->ns = 0;
 	ll->timeout = 3;
-	ll->numTries = 4;
+	ll->numTries = 1 + numRetries;
 
 	if (!saveCurrentPortSettingsAndSetNewTermios()) {
 		printf(
@@ -180,10 +181,8 @@ int llwrite(int fd, const char* buf, ui bufSize) {
 		Message* receivedMessage = receiveMessage(fd);
 
 		if (messageIsCommand(receivedMessage, RR)) {
-//			printf("ll->ns: %d; Received RR with nr: %d\n", ll->ns,
-//					receivedMessage->nr);
-//
-//			ll->ns = receivedMessage->nr;
+			if (ll->ns != receivedMessage->nr)
+				ll->ns = receivedMessage->nr;
 
 			stopAlarm();
 			transferring = 0;
@@ -208,23 +207,22 @@ int llread(int fd, char** message) {
 		switch (msg->type) {
 		case INVALID:
 			printf("INVALID message received.\n");
-			ll->ns = !msg->nr;
-			sendCommand(fd, REJ);
+
+			//ll->ns = msg->ns;
+			//sendCommand(fd, REJ);
+
 			break;
 		case COMMAND:
-			// printf("COMMAND message received.\n");
-
 			if (msg->command == DISC)
 				done = 1;
 			break;
 		case DATA:
-			// printf("DATA message received.\n");
-
-			if (msg->nr != ll->ns) {
+			if (ll->ns == msg->ns) {
 				*message = malloc(msg->messageSize);
 				memcpy(*message, msg->message, msg->messageSize);
 				free(msg->message);
 
+				ll->ns = !msg->ns;
 				sendCommand(fd, RR);
 
 				done = 1;
@@ -234,6 +232,8 @@ int llread(int fd, char** message) {
 			break;
 		}
 	}
+
+	stopAlarm();
 
 	return 1;
 }
@@ -247,7 +247,7 @@ int llclose(int fd, ConnnectionMode mode) {
 	case SEND: {
 		while (!disconnected) {
 			if (try == 0 || alarmWentOff) {
-				alarmWentOff = 0;
+				alarmWentOff = FALSE;
 
 				if (try >= ll->numTries) {
 					stopAlarm();
@@ -263,7 +263,7 @@ int llclose(int fd, ConnnectionMode mode) {
 			}
 
 			if (messageIsCommand(receiveMessage(fd), DISC))
-				disconnected = 1;
+				disconnected = TRUE;
 		}
 
 		stopAlarm();
@@ -277,18 +277,18 @@ int llclose(int fd, ConnnectionMode mode) {
 	case RECEIVE: {
 		while (!disconnected) {
 			if (messageIsCommand(receiveMessage(fd), DISC))
-				disconnected = 1;
+				disconnected = TRUE;
 		}
 
-		int uaReceived = 0;
+		int uaReceived = FALSE;
 		while (!uaReceived) {
 			if (try == 0 || alarmWentOff) {
-				alarmWentOff = 0;
+				alarmWentOff = FALSE;
 
 				if (try >= ll->numTries) {
 					stopAlarm();
 					printf("ERROR: Disconnect could not be sent.\n");
-					return -1;
+					return 0;
 				}
 
 				sendCommand(fd, DISC);
@@ -298,7 +298,7 @@ int llclose(int fd, ConnnectionMode mode) {
 			}
 
 			if (messageIsCommand(receiveMessage(fd), UA))
-				uaReceived = 1;
+				uaReceived = TRUE;
 		}
 
 		stopAlarm();
@@ -385,67 +385,69 @@ ControlField getCommandControlField(char* commandStr, Command command) {
 	}
 }
 
-const int DEBUG_STATE_MACHINE = 0;
-
 char* createMessage(const char* buf, ui bufSize) {
-	char BCC = 0;
+	char* message = malloc(MESSAGE_SIZE + bufSize);
+
+	char C = ll->ns << 6;
+
+	char BCC1 = A ^ C;
+
+	char BCC2 = 0;
 	int i;
 	for (i = 0; i < bufSize; i++)
-		BCC ^= buf[i];
+		BCC2 ^= buf[i];
 
-	char* msg = malloc(MESSAGE_SIZE + bufSize);
-	msg[0] = FLAG;
-	msg[1] = A;
-	msg[2] = ll->ns << 6;
-	msg[3] = msg[1] ^ msg[2];
-	memcpy(&msg[4], buf, bufSize);
-	msg[4 + bufSize] = BCC;
-	msg[5 + bufSize] = FLAG;
+	message[0] = FLAG;
+	message[1] = A;
+	message[2] = C;
+	message[3] = BCC1;
+	memcpy(&message[4], buf, bufSize);
+	message[4 + bufSize] = BCC2;
+	message[5 + bufSize] = FLAG;
 
-	return msg;
+	return message;
 }
 
-int sendMessage(int fd, const char* buf, ui bufSize) {
-	char* msg = createMessage(buf, bufSize);
-	bufSize += MESSAGE_SIZE;
+int sendMessage(int fd, const char* message, ui messageSize) {
+	char* msg = createMessage(message, messageSize);
+	messageSize += MESSAGE_SIZE;
 
-	bufSize = stuff(&msg, bufSize);
+	messageSize = stuff(&msg, messageSize);
 
-	ui numWrittenBytes = write(fd, msg, bufSize);
-	if (numWrittenBytes != bufSize)
+	ui numWrittenBytes = write(fd, msg, messageSize);
+	if (numWrittenBytes != messageSize)
 		perror("ERROR: error while sending message.\n");
 
 	free(msg);
 
-	return numWrittenBytes == bufSize;
+	return numWrittenBytes == messageSize;
 }
 
-#define FRAME_SIZE 256
+const int DEBUG_STATE_MACHINE = TRUE;
 
 Message* receiveMessage(int fd) {
 	Message* msg = (Message*) malloc(sizeof(Message));
 	msg->type = INVALID;
 
-	ui bufSize = 0;
-	char* buf = malloc(FRAME_SIZE);
-
 	State state = START;
+
+	ui bufSize = 0;
+	char* buf = malloc(MAX_FRAME_SIZE);
 
 	volatile int done = FALSE;
 	while (!done) {
 		unsigned char c;
 
+		// if not stopping
 		if (state != STOP) {
+			// read message
 			int numReadBytes = read(fd, &c, 1);
 
-			if (DEBUG_STATE_MACHINE) {
-				printf("Number of bytes read: %d\n", numReadBytes);
-				if (numReadBytes)
-					printf("Read char: 0x%02x\n", c);
-			}
-
+			// if nothing was read
 			if (!numReadBytes) {
 				printf("ERROR: nothing received.\n");
+
+				// return invalid message
 				msg->type = INVALID;
 				return msg;
 			}
@@ -456,7 +458,9 @@ Message* receiveMessage(int fd) {
 			if (c == FLAG) {
 				if (DEBUG_STATE_MACHINE)
 					printf("START: FLAG received. Going to FLAG_RCV.\n");
+
 				buf[bufSize++] = c;
+
 				state = FLAG_RCV;
 			}
 			break;
@@ -464,10 +468,13 @@ Message* receiveMessage(int fd) {
 			if (c == A) {
 				if (DEBUG_STATE_MACHINE)
 					printf("FLAG_RCV: A received. Going to A_RCV.\n");
+
 				buf[bufSize++] = c;
+
 				state = A_RCV;
 			} else if (c != FLAG) {
 				bufSize = 0;
+
 				state = START;
 			}
 			break;
@@ -475,12 +482,15 @@ Message* receiveMessage(int fd) {
 			if (c != FLAG) {
 				if (DEBUG_STATE_MACHINE)
 					printf("A_RCV: C received. Going to C_RCV.\n");
+
 				buf[bufSize++] = c;
+
 				state = C_RCV;
 			} else if (c == FLAG)
 				state = FLAG_RCV;
 			else {
 				bufSize = 0;
+
 				state = START;
 			}
 			break;
@@ -488,12 +498,15 @@ Message* receiveMessage(int fd) {
 			if (c == (A ^ buf[A_RCV])) {
 				if (DEBUG_STATE_MACHINE)
 					printf("C_RCV: BCC received. Going to BCC_OK.\n");
+
 				buf[bufSize++] = c;
+
 				state = BCC_OK;
 			} else if (c == FLAG)
 				state = FLAG_RCV;
 			else {
 				bufSize = 0;
+
 				state = START;
 			}
 			break;
@@ -525,9 +538,10 @@ Message* receiveMessage(int fd) {
 				} else if (msg->type == INVALID)
 					msg->type = DATA;
 
-				if (bufSize % FRAME_SIZE == 0) {
-					int m = bufSize / FRAME_SIZE + 1;
-					buf = (char*) realloc(buf, m * FRAME_SIZE);
+				// if writing at the end and more bytes will still be received
+				if (bufSize % MAX_FRAME_SIZE == 0) {
+					int m = bufSize / MAX_FRAME_SIZE + 1;
+					buf = (char*) realloc(buf, m * MAX_FRAME_SIZE);
 				}
 
 				buf[bufSize++] = c;
@@ -544,38 +558,55 @@ Message* receiveMessage(int fd) {
 
 	bufSize = destuff(&buf, bufSize);
 
+	char A = buf[1];
+	char C = buf[2];
+	char BCC1 = buf[3];
+
+	if ((A ^ C) != BCC1) {
+		printf("ERROR: invalid BCC1.\n");
+		msg->type = INVALID;
+		free(buf);
+		return msg;
+	}
+
 	if (msg->type == COMMAND) {
+		// get message command
 		msg->command = getCommandWithControlField(buf[2]);
 
+		// get command control field
 		char commandStr[MAX_SIZE];
 		ControlField controlField = getCommandControlField(commandStr,
 				msg->command);
 
-		if (msg->command == RR || msg->command == REJ) {
+		if (msg->command == RR || msg->command == REJ)
 			msg->nr = (controlField >> 7) & BIT(1);
+	} else if (msg->type == DATA) {
+		msg->messageSize = bufSize - MESSAGE_SIZE;
 
-			if (msg->nr != ll->ns)
-				ll->ns = msg->nr;
-			else
-				printf("@@@ nr was the same as ns\n");
+		// calculate bcc2
+		char calculatedBCC2 = 0;
+		int i;
+		for (i = 4; i < msg->messageSize; i++)
+			calculatedBCC2 ^= buf[i];
+
+		// get received bcc2
+		char BCC2 = buf[4 + msg->messageSize];
+
+		if (calculatedBCC2 != BCC2) {
+			printf("ERROR: invalid BCC2: 0x%02x != 0x%02x.\n", calculatedBCC2,
+					BCC2);
+			msg->type = INVALID;
+			free(buf);
+			return msg;
 		}
 
-		printf("RECEIVED: %s; control field: %02x; with nr: %d\n", commandStr,
-				controlField, msg->nr);
-	} else if (msg->type == DATA) {
-		msg->nr = (buf[2] >> 6) & BIT(1);
+		msg->ns = (buf[2] >> 6) & BIT(1);
 
-		if (msg->nr == ll->ns)
-			msg->nr = !msg->nr;
-		else
-			printf("@@@ ns received was NOT the same as ns sent");
-
-		msg->messageSize = bufSize - MESSAGE_SIZE;
+		// copy message
 		msg->message = malloc(msg->messageSize);
 		memcpy(msg->message, &buf[4], msg->messageSize);
 	}
 
-	// printBuf(buf);
 	free(buf);
 
 	return msg;

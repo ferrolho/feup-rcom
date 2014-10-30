@@ -32,7 +32,7 @@ typedef struct {
 	unsigned char* message;
 	ui messageSize;
 
-	int nr;
+	int ns, nr;
 } Message;
 
 typedef struct {

@@ -21,18 +21,26 @@ typedef enum {
 } MessageType;
 
 typedef enum {
+	INPUT_OUTPUT_ERROR, BCC1_ERROR, BCC2_ERROR
+} MessageError;
+
+typedef enum {
 	COMMAND_SIZE = 5 * sizeof(char), MESSAGE_SIZE = 6 * sizeof(char)
 } MessageSize;
 
 typedef struct {
 	MessageType type;
 
+	int ns, nr;
+
 	Command command;
 
-	unsigned char* message;
-	ui messageSize;
+	struct {
+		unsigned char* message;
+		ui messageSize;
+	} data;
 
-	int ns, nr;
+	MessageError error;
 } Message;
 
 typedef struct {
@@ -73,23 +81,25 @@ int openSerialPort(const char* port);
 int closeSerialPort();
 
 int llopen(ConnnectionMode mode);
-int llwrite(int fd, const char* buf, ui bufSize);
-int llread(int fd, char** message);
+int llwrite(int fd, const unsigned char* buf, ui bufSize);
+int llread(int fd, unsigned char** message);
 int llclose(int fd, ConnnectionMode mode);
 
-char* createCommand(ControlField C);
+unsigned char* createCommand(ControlField C);
 int sendCommand(int fd, Command command);
 Command getCommandWithControlField(ControlField controlField);
 ControlField getCommandControlField(char* commandStr, Command command);
 
-char* createMessage(const char* buf, ui bufSize);
-int sendMessage(int fd, const char* buf, ui bufSize);
+unsigned char* createMessage(const unsigned char* buf, ui bufSize);
+int sendMessage(int fd, const unsigned char* buf, ui bufSize);
 
 Message* receiveMessage(int fd);
 int messageIsCommand(Message* msg, Command command);
 
-ui stuff(char** buf, ui bufSize);
-ui destuff(char** buf, ui bufSize);
+ui stuff(unsigned char** buf, ui bufSize);
+ui destuff(unsigned char** buf, ui bufSize);
+
+unsigned char processBCC(const unsigned char* buf, ui size);
 
 void cleanBuf(unsigned char* buf, ui bufSize);
 void printBuf(unsigned char* buf);

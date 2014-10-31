@@ -83,6 +83,8 @@ int sendFile() {
 	// allocate space for file buffer
 	char* fileBuf = malloc(MAX_SIZE);
 
+	printf("*** Starting file chunks transfer. ***\n");
+
 	// read file chunks
 	ui readBytes = 0, writtenBytes = 0, i = 0;
 	while ((readBytes = fread(fileBuf, sizeof(char), MAX_SIZE, file)) > 0) {
@@ -103,6 +105,8 @@ int sendFile() {
 		fflush(stdout);
 	}
 	printf("\n");
+
+	printf("*** File chunks transfer complete. ***\n");
 
 	free(fileBuf);
 
@@ -152,7 +156,8 @@ int receiveFile() {
 	printf("Successfully created output file: %s.\n", al->fileName);
 	printf("Size of the file to be received: %d (bytes).\n", fileSize);
 
-	printf("Starting to receive file data.\n");
+	printf("*** Starting file chunks transfer. ***\n");
+
 	int fileSizeReadSoFar = 0, N = -1;
 	while (fileSizeReadSoFar != fileSize) {
 		int lastN = N;
@@ -185,6 +190,8 @@ int receiveFile() {
 		fflush(stdout);
 	}
 	printf("\n");
+
+	printf("*** File chunks transfer complete. ***\n");
 
 	// close output file
 	if (fclose(outputFile) != 0) {
@@ -228,7 +235,7 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 	ui i = 0, pos = 0;
 
 	// create control package
-	char controlPackage[packageSize];
+	unsigned char controlPackage[packageSize];
 	controlPackage[pos++] = C;
 	controlPackage[pos++] = PARAM_FILE_SIZE;
 	controlPackage[pos++] = strlen(fileSize);
@@ -266,7 +273,7 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 		char** fileName) {
 	// receive control package
-	char* package;
+	unsigned char* package;
 	ui totalSize = llread(fd, &package);
 	if (totalSize < 0) {
 		printf(
@@ -318,7 +325,7 @@ int sendDataPackage(int fd, int N, const char* buffer, int length) {
 	ui packageSize = 4 + length;
 
 	// allocate space for package header and file chunk
-	char* package = (char*) malloc(packageSize);
+	unsigned char* package = (unsigned char*) malloc(packageSize);
 
 	// build package header
 	package[0] = C;
@@ -344,7 +351,7 @@ int sendDataPackage(int fd, int N, const char* buffer, int length) {
 }
 
 int receiveDataPackage(int fd, int* N, char** buf, int* length) {
-	char* package;
+	unsigned char* package;
 
 	// read package from link layer
 	ui size = llread(fd, &package);

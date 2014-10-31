@@ -183,8 +183,14 @@ int llwrite(int fd, const unsigned char* buf, ui bufSize) {
 		Message* receivedMessage = receiveMessage(fd);
 
 		if (messageIsCommand(receivedMessage, RR)) {
-			if (ll->ns != receivedMessage->nr)
+			if (ll->ns != receivedMessage->nr) {
+				printf(
+						"updating ns based on rr: ll->ns = receivedMessage->nr (%d)\n",
+						receivedMessage->nr);
 				ll->ns = receivedMessage->nr;
+			}
+
+			//ll->ns = !ll->ns;
 
 			stopAlarm();
 			transferring = 0;
@@ -210,7 +216,8 @@ int llread(int fd, unsigned char** message) {
 		case INVALID:
 			printf("INVALID message received.\n");
 
-			if (BCC2_ERROR) {
+			if (msg->error == BCC2_ERROR) {
+				printf("llread bcc2 error: ll->ns = msg->ns(%d)\n", msg->ns);
 				ll->ns = msg->ns;
 				sendCommand(fd, REJ);
 			}
@@ -221,6 +228,8 @@ int llread(int fd, unsigned char** message) {
 				done = 1;
 			break;
 		case DATA:
+			printf("if (ll->ns == msg->ns) :: if (%d == %d)\n", ll->ns,
+					msg->ns);
 			if (ll->ns == msg->ns) {
 				*message = malloc(msg->data.messageSize);
 				memcpy(*message, msg->data.message, msg->data.messageSize);
@@ -229,9 +238,9 @@ int llread(int fd, unsigned char** message) {
 				ll->ns = !msg->ns;
 				sendCommand(fd, RR);
 
-				done = 1;
+				done = TRUE;
 			} else
-				printf("\tBad Nr associated, ignoring message.\n");
+				printf("\tBad message ns associated, ignoring message.\n");
 
 			break;
 		}
@@ -398,6 +407,7 @@ unsigned char* createMessage(const unsigned char* message, ui size) {
 	unsigned char C = ll->ns << 6;
 	unsigned char BCC1 = A ^ C;
 	unsigned char BCC2 = processBCC(message, size);
+	printf("createMessage: C: 0x%02x\tll->ns: %d\n", C, ll->ns);
 
 	msg[0] = FLAG;
 	msg[1] = A;
@@ -591,7 +601,9 @@ Message* receiveMessage(int fd) {
 		printf("Received command: %s.\n", commandStr);
 
 		if (msg->command == RR || msg->command == REJ)
-			msg->nr = (controlField >> 7) & BIT(1);
+			msg->nr = (controlField >> 7) & BIT(0);
+
+		printf("\tcontrolField: 0x%02x\tmsg->nr: %d\n", controlField, msg->nr);
 	} else if (msg->type == DATA) {
 		msg->data.messageSize = size - MESSAGE_SIZE;
 
@@ -608,7 +620,8 @@ Message* receiveMessage(int fd) {
 			return msg;
 		}
 
-		msg->ns = (message[2] >> 6) & BIT(1);
+		msg->ns = (message[2] >> 6) & BIT(0);
+		printf("DATA: message[2]: 0x%02x\tmsg->ns: %d\n", message[2], msg->ns);
 
 		// copy message
 		msg->data.message = malloc(msg->data.messageSize);

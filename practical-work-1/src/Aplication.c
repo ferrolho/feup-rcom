@@ -317,9 +317,9 @@ int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 }
 
 int sendDataPackage(int fd, int N, const char* buffer, int length) {
-	int C = CTRL_PKG_DATA;
-	int L2 = length / 256;
-	int L1 = length % 256;
+	unsigned char C = CTRL_PKG_DATA;
+	unsigned char L2 = length / 256;
+	unsigned char L1 = length % 256;
 
 	// calculate package size
 	ui packageSize = 4 + length;

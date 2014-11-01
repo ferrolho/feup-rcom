@@ -21,7 +21,7 @@ LinkLayer* ll;
 int numRetries = 3;
 #define MAX_FRAME_SIZE 512
 
-const int DEBUG_STATE_MACHINE = TRUE;
+const int DEBUG_STATE_MACHINE = FALSE;
 
 int initLinkLayer(const char* port, ConnnectionMode mode) {
 	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
@@ -183,14 +183,8 @@ int llwrite(int fd, const unsigned char* buf, ui bufSize) {
 		Message* receivedMessage = receiveMessage(fd);
 
 		if (messageIsCommand(receivedMessage, RR)) {
-			if (ll->ns != receivedMessage->nr) {
-				printf(
-						"updating ns based on rr: ll->ns = receivedMessage->nr (%d)\n",
-						receivedMessage->nr);
+			if (ll->ns != receivedMessage->nr)
 				ll->ns = receivedMessage->nr;
-			}
-
-			//ll->ns = !ll->ns;
 
 			stopAlarm();
 			transferring = 0;
@@ -217,7 +211,6 @@ int llread(int fd, unsigned char** message) {
 			printf("INVALID message received.\n");
 
 			if (msg->error == BCC2_ERROR) {
-				printf("llread bcc2 error: ll->ns = msg->ns(%d)\n", msg->ns);
 				ll->ns = msg->ns;
 				sendCommand(fd, REJ);
 			}
@@ -228,8 +221,6 @@ int llread(int fd, unsigned char** message) {
 				done = 1;
 			break;
 		case DATA:
-			printf("if (ll->ns == msg->ns) :: if (%d == %d)\n", ll->ns,
-					msg->ns);
 			if (ll->ns == msg->ns) {
 				*message = malloc(msg->data.messageSize);
 				memcpy(*message, msg->data.message, msg->data.messageSize);
@@ -239,8 +230,9 @@ int llread(int fd, unsigned char** message) {
 				sendCommand(fd, RR);
 
 				done = TRUE;
+
 			} else
-				printf("\tBad message ns associated, ignoring message.\n");
+				printf("\tWrong message ns associated: ignoring message.\n");
 
 			break;
 		}
@@ -355,7 +347,7 @@ int sendCommand(int fd, Command command) {
 
 	free(commandBuf);
 
-	printf("Sent command: %s.\n", commandStr);
+	// printf("Sent command: %s.\n", commandStr);
 
 	return successfullySentCommand;
 }
@@ -407,7 +399,6 @@ unsigned char* createMessage(const unsigned char* message, ui size) {
 	unsigned char C = ll->ns << 6;
 	unsigned char BCC1 = A ^ C;
 	unsigned char BCC2 = processBCC(message, size);
-	printf("createMessage: C: 0x%02x\tll->ns: %d\n", C, ll->ns);
 
 	msg[0] = FLAG;
 	msg[1] = A;
@@ -438,6 +429,7 @@ int sendMessage(int fd, const unsigned char* message, ui messageSize) {
 Message* receiveMessage(int fd) {
 	Message* msg = (Message*) malloc(sizeof(Message));
 	msg->type = INVALID;
+	msg->ns = msg->nr = -1;
 
 	State state = START;
 
@@ -594,21 +586,20 @@ Message* receiveMessage(int fd) {
 		msg->command = getCommandWithControlField(message[2]);
 
 		// get command control field
-		char commandStr[MAX_SIZE];
-		ControlField controlField = getCommandControlField(commandStr,
-				msg->command);
+		ControlField controlField = message[2];
 
-		printf("Received command: %s.\n", commandStr);
+		char commandStr[MAX_SIZE];
+		getCommandControlField(commandStr, msg->command);
+		// printf("Received command: %s.\n", commandStr);
 
 		if (msg->command == RR || msg->command == REJ)
 			msg->nr = (controlField >> 7) & BIT(0);
-
-		printf("\tcontrolField: 0x%02x\tmsg->nr: %d\n", controlField, msg->nr);
 	} else if (msg->type == DATA) {
 		msg->data.messageSize = size - MESSAGE_SIZE;
 
 		unsigned char calcBCC2 = processBCC(&message[4], msg->data.messageSize);
 		unsigned char BCC2 = message[4 + msg->data.messageSize];
+
 		if (calcBCC2 != BCC2) {
 			printf("ERROR: invalid BCC2: 0x%02x != 0x%02x.\n", calcBCC2, BCC2);
 
@@ -621,7 +612,6 @@ Message* receiveMessage(int fd) {
 		}
 
 		msg->ns = (message[2] >> 6) & BIT(0);
-		printf("DATA: message[2]: 0x%02x\tmsg->ns: %d\n", message[2], msg->ns);
 
 		// copy message
 		msg->data.message = malloc(msg->data.messageSize);

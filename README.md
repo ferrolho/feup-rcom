@@ -1,4 +1,4 @@
-feup-rcom
+FEUP-RCOM
 =========
 
-A repository to host RCOM projects.
+A repository to host RCOM - computer networks - projects.

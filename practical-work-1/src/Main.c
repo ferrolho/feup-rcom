@@ -3,25 +3,30 @@
 #include <string.h>
 #include <unistd.h>
 #include "Aplication.h"
+#include "CLI.h"
 
 static void printUsage(char* argv0);
 static int procArgs(int argc, char** argv);
 static void printArguments(ConnnectionMode mode, char* port, char* file);
 
 int main(int argc, char** argv) {
-	if (argc != 4) {
+	if (argc != 1 && argc != 4) {
 		printf("ERROR: Wrong number of arguments.\n");
 		printUsage(argv[0]);
 		return 1;
 	}
 
-	procArgs(argc, argv);
+	if (argc == 1)
+		startCLI();
+	else if (argc == 4)
+		procArgs(argc, argv);
 
 	return 0;
 }
 
 static void printUsage(char* argv0) {
-	printf("Usage: %s <send|receive> <port> <file>\n", argv0);
+	printf("Usage: %s\n", argv0);
+	printf("       %s <send|receive> <port> <file>\n", argv0);
 }
 
 static int procArgs(int argc, char** argv) {
@@ -43,7 +48,7 @@ static int procArgs(int argc, char** argv) {
 
 	printArguments(mode, port, file);
 
-	initApplicationLayer(port, mode, file);
+	initApplicationLayer(port, mode, B38400, file);
 
 	return 0;
 }

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "DataLink.h"
+#include "CLI.h"
 #include "ConnectionMode.h"
 #include "ControlPackageType.h"
 #include "ParameterType.h"
@@ -16,7 +17,8 @@
 
 ApplicationLayer* al;
 
-int initApplicationLayer(const char* port, ConnnectionMode mode, char* file) {
+int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
+		char* file) {
 	al = (ApplicationLayer*) malloc(sizeof(ApplicationLayer));
 
 	al->fd = openSerialPort(port);
@@ -27,7 +29,7 @@ int initApplicationLayer(const char* port, ConnnectionMode mode, char* file) {
 	al->mode = mode;
 	al->fileName = file;
 
-	if (!initLinkLayer(port, mode)) {
+	if (!initLinkLayer(port, mode, baudrate)) {
 		printf("ERROR: Could not initialize Link Layer.\n");
 		return 0;
 	}
@@ -100,9 +102,7 @@ int sendFile() {
 		// increment no. of written bytes
 		writtenBytes += readBytes;
 
-		float transferredPercentage = 100.0 * writtenBytes / fileSize;
-		printf("\rCompleted: %03.2f%%", transferredPercentage);
-		fflush(stdout);
+		printProgressBar(writtenBytes, fileSize);
 	}
 	printf("\n");
 
@@ -185,9 +185,7 @@ int receiveFile() {
 		// increment no. of read bytes
 		fileSizeReadSoFar += length;
 
-		float transferredPercentage = 100.0 * fileSizeReadSoFar / fileSize;
-		printf("\rCompleted: %03.2f%%", transferredPercentage);
-		fflush(stdout);
+		printProgressBar(fileSizeReadSoFar, fileSize);
 	}
 	printf("\n");
 

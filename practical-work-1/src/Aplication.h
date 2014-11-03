@@ -17,7 +17,8 @@ typedef struct {
 
 extern ApplicationLayer* al;
 
-int initApplicationLayer(const char* port, ConnnectionMode mode, char* file);
+int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
+		char* file);
 int startConnection();
 
 int sendFile();

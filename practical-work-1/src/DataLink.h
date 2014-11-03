@@ -71,7 +71,9 @@ typedef struct {
 
 extern LinkLayer* ll;
 
-int initLinkLayer(const char* port, ConnnectionMode mode);
+int getBaudrate(int baudrate);
+
+int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate);
 
 int saveCurrentPortSettingsAndSetNewTermios();
 int saveCurrentTermiosSettings();

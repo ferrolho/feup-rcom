@@ -10,7 +10,6 @@
 #include "Alarm.h"
 #include "Aplication.h"
 
-const int BAUDRATE = B38400;
 const int FLAG = 0x7E;
 const int A = 0x03;
 const int ESCAPE = 0x7D;
@@ -19,16 +18,63 @@ LinkLayer* ll;
 
 // TODO change this
 int numRetries = 3;
-#define MAX_FRAME_SIZE 512
+#define MAX_FRAME_SIZE 256
 
 const int DEBUG_STATE_MACHINE = FALSE;
 
-int initLinkLayer(const char* port, ConnnectionMode mode) {
+int getBaudrate(int baudrate) {
+	switch (baudrate) {
+	case 0:
+		return B0;
+	case 50:
+		return B50;
+	case 75:
+		return B75;
+	case 110:
+		return B110;
+	case 134:
+		return B134;
+	case 150:
+		return B150;
+	case 200:
+		return B200;
+	case 300:
+		return B300;
+	case 600:
+		return B600;
+	case 1200:
+		return B1200;
+	case 1800:
+		return B1800;
+	case 2400:
+		return B2400;
+	case 4800:
+		return B4800;
+	case 9600:
+		return B9600;
+	case 19200:
+		return B19200;
+	case 38400:
+		return B38400;
+	case 57600:
+		return B57600;
+	case 115200:
+		return B115200;
+	case 230400:
+		return B230400;
+	case 460800:
+		return B460800;
+	default:
+		return -1;
+	}
+}
+
+int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate) {
 	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
 
 	strcpy(ll->port, port);
 	ll->mode = mode;
-	ll->baudRate = BAUDRATE;
+	ll->baudRate = baudrate;
 	ll->ns = 0;
 	ll->timeout = 3;
 	ll->numTries = 1 + numRetries;
@@ -67,7 +113,7 @@ int saveCurrentTermiosSettings() {
 
 int setNewTermios() {
 	bzero(&ll->newtio, sizeof(ll->newtio));
-	ll->newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	ll->newtio.c_cflag = ll->baudRate | CS8 | CLOCAL | CREAD;
 	ll->newtio.c_iflag = IGNPAR;
 	ll->newtio.c_oflag = 0;
 	ll->newtio.c_lflag = 0;
@@ -447,7 +493,7 @@ Message* receiveMessage(int fd) {
 
 			// if nothing was read
 			if (!numReadBytes) {
-				printf("ERROR: nothing received.\n");
+				// printf("ERROR: nothing received.\n");
 
 				free(message);
 

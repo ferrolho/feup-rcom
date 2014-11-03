@@ -269,6 +269,7 @@ int llread(int fd, unsigned char** message) {
 
 		switch (msg->type) {
 		case INVALID:
+			if (DEBUG_MODE)
 			printf("INVALID message received.\n");
 
 			if (msg->error == BCC2_ERROR) {

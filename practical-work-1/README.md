@@ -18,5 +18,5 @@ sudo ./nserial send /dev/ttyS4 pinguim.gif off
 
 Screenshots
 -----------
-![img](http://i.imgur.com/HfhPFNv.png)
-![img](http://i.imgur.com/yCCGbe8.png)
+![img](http://i.imgur.com/Ov8UaW9.png)
+![img](http://i.imgur.com/zjsxGBC.png)

@@ -74,6 +74,7 @@ int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate,
 	ll->ns = 0;
 	ll->timeout = timeout;
 	ll->numTries = 1 + numRetries;
+	ll->stats = initStatistics();
 
 	if (!saveCurrentPortSettingsAndSetNewTermios()) {
 		printf(
@@ -89,7 +90,12 @@ Statistics* initStatistics() {
 
 	stats->sentMessages = 0;
 	stats->receivedMessages = 0;
+
 	stats->timeouts = 0;
+
+	stats->numSentRR = 0;
+	stats->numReceivedRR = 0;
+
 	stats->numSentREJ = 0;
 	stats->numReceivedREJ = 0;
 
@@ -404,6 +410,8 @@ int sendCommand(int fd, Command command) {
 
 	if (command == REJ)
 		ll->stats->numSentREJ++;
+	else if (command == RR)
+		ll->stats->numSentRR++;
 
 	if (DEBUG_MODE)
 		printf("Sent command: %s.\n", commandStr);
@@ -661,6 +669,8 @@ Message* receiveMessage(int fd) {
 
 		if (msg->command == REJ)
 			ll->stats->numReceivedREJ++;
+		else if (msg->command == RR)
+			ll->stats->numReceivedRR++;
 	} else if (msg->type == DATA) {
 		msg->data.messageSize = size - MESSAGE_SIZE;
 

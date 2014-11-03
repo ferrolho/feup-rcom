@@ -49,6 +49,9 @@ typedef struct {
 
 	int timeouts;
 
+	int numSentRR;
+	int numReceivedRR;
+
 	int numSentREJ;
 	int numReceivedREJ;
 } Statistics;

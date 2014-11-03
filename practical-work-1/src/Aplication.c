@@ -96,17 +96,21 @@ int startConnection() {
 }
 
 void printConnectionStatistics() {
+	printf("\n");
 	printf("=========================\n");
 	printf("= Connection statistics =\n");
 	printf("=========================\n");
 
 	printf("# Sent messages: %d\n", ll->stats->sentMessages);
 	printf("# Received messages: %d\n", ll->stats->receivedMessages);
+	printf("#\n");
 	printf("# Time-outs: %d\n", ll->stats->timeouts);
+	printf("#\n");
+	printf("# Sent RR: %d\n", ll->stats->numSentRR);
+	printf("# Received RR: %d\n", ll->stats->numReceivedRR);
+	printf("#\n");
 	printf("# Sent REJ: %d\n", ll->stats->numSentREJ);
 	printf("# Received REJ: %d\n", ll->stats->numReceivedREJ);
-
-	printf("\n");
 }
 
 int sendFile() {

@@ -53,6 +53,8 @@ typedef struct {
 	// transmission speed
 	int baudRate;
 
+	int messageDataMaxSize;
+
 	// frame sequence number (0, 1)
 	ui ns;
 
@@ -73,7 +75,8 @@ extern LinkLayer* ll;
 
 int getBaudrate(int baudrate);
 
-int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate);
+int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate,
+		int messageDataMaxSize, int timeout, int numRetries);
 
 int saveCurrentPortSettingsAndSetNewTermios();
 int saveCurrentTermiosSettings();

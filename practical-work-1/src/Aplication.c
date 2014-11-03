@@ -15,10 +15,12 @@
 #include "ParameterType.h"
 #include "Utilities.h"
 
+int DEBUG_MODE = FALSE;
+
 ApplicationLayer* al;
 
 int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
-		char* file) {
+		int messageDataMaxSize, int numRetries, int timeout, char* file) {
 	al = (ApplicationLayer*) malloc(sizeof(ApplicationLayer));
 
 	al->fd = openSerialPort(port);
@@ -29,10 +31,13 @@ int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
 	al->mode = mode;
 	al->fileName = file;
 
-	if (!initLinkLayer(port, mode, baudrate)) {
+	if (!initLinkLayer(port, mode, baudrate, messageDataMaxSize, numRetries,
+			timeout)) {
 		printf("ERROR: Could not initialize Link Layer.\n");
 		return 0;
 	}
+
+	printConnectionInfo();
 
 	startConnection();
 
@@ -42,14 +47,43 @@ int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
 	return 1;
 }
 
+void printConnectionInfo() {
+	printf("===================\n");
+	printf("= Connection info =\n");
+	printf("===================\n");
+
+	switch (ll->mode) {
+	case SEND:
+		printf("# Mode: Send\n");
+		break;
+	case RECEIVE:
+		printf("# Mode: Receive\n");
+		break;
+	default:
+		printf("# ERROR: Mode: Default\n");
+		break;
+	}
+
+	printf("# Baud rate: %d\n", ll->baudRate);
+	printf("# Message data max. size: %d\n", ll->messageDataMaxSize);
+	printf("# Max. no. retries: %d\n", ll->numTries - 1);
+	printf("# Time-out interval: %d\n", ll->timeout);
+	printf("# Port: %s\n", ll->port);
+	printf("# File: %s\n", al->fileName);
+
+	printf("\n");
+}
+
 int startConnection() {
 	switch (al->mode) {
 	case RECEIVE:
-		printf("Starting connection in RECEIVE mode.\n");
+		if (DEBUG_MODE)
+			printf("Starting connection in RECEIVE mode.\n");
 		receiveFile();
 		break;
 	case SEND:
-		printf("Starting connection in SEND mode.\n");
+		if (DEBUG_MODE)
+			printf("Starting connection in SEND mode.\n");
 		sendFile();
 		break;
 	default:
@@ -65,7 +99,7 @@ int sendFile() {
 	if (!file) {
 		printf("ERROR: Could not open file to be sent.\n");
 		return 0;
-	} else
+	} else if (DEBUG_MODE)
 		printf("Successfully opened file to be sent.\n");
 
 	// open connection
@@ -85,7 +119,8 @@ int sendFile() {
 	// allocate space for file buffer
 	char* fileBuf = malloc(MAX_SIZE);
 
-	printf("*** Starting file chunks transfer. ***\n");
+	if (DEBUG_MODE)
+		printf("*** Starting file chunks transfer. ***\n");
 
 	// read file chunks
 	ui readBytes = 0, writtenBytes = 0, i = 0;
@@ -104,9 +139,10 @@ int sendFile() {
 
 		printProgressBar(writtenBytes, fileSize);
 	}
-	printf("\n");
+	printf("\n\n");
 
-	printf("*** File chunks transfer complete. ***\n");
+	if (DEBUG_MODE)
+		printf("*** File chunks transfer complete. ***\n");
 
 	free(fileBuf);
 
@@ -121,7 +157,8 @@ int sendFile() {
 	if (!llclose(al->fd, ll->mode))
 		return 0;
 
-	printf("*** File successfully transferred. ***\n");
+	printf("\n");
+	printf("File successfully transferred.\n");
 
 	return 1;
 }
@@ -135,7 +172,8 @@ int receiveFile() {
 	int controlStart, fileSize;
 	char* fileName;
 
-	printf("Waiting for START control package.\n");
+	if (DEBUG_MODE)
+		printf("Waiting for START control package.\n");
 	if (!receiveControlPackage(al->fd, &controlStart, &fileSize, &fileName))
 		return 0;
 
@@ -153,10 +191,13 @@ int receiveFile() {
 		return 0;
 	}
 
-	printf("Successfully created output file: %s.\n", al->fileName);
-	printf("Size of the file to be received: %d (bytes).\n", fileSize);
+	printf("\n");
+	printf("Created output file: %s\n", al->fileName);
+	printf("Expected file size: %d (bytes)\n", fileSize);
+	printf("\n");
 
-	printf("*** Starting file chunks transfer. ***\n");
+	if (DEBUG_MODE)
+		printf("*** Starting file chunks transfer. ***\n");
 
 	int fileSizeReadSoFar = 0, N = -1;
 	while (fileSizeReadSoFar != fileSize) {
@@ -187,9 +228,10 @@ int receiveFile() {
 
 		printProgressBar(fileSizeReadSoFar, fileSize);
 	}
-	printf("\n");
+	printf("\n\n");
 
-	printf("*** File chunks transfer complete. ***\n");
+	if (DEBUG_MODE)
+		printf("*** File chunks transfer complete. ***\n");
 
 	// close output file
 	if (fclose(outputFile) != 0) {
@@ -215,18 +257,21 @@ int receiveFile() {
 		return 0;
 	}
 
-	printf("*** File successfully received. ***\n");
+	printf("\n");
+	printf("File successfully received.\n");
 
 	return 1;
 }
 
 int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
-	if (C == CTRL_PKG_START)
-		printf("Sending START control package.\n");
-	else if (C == CTRL_PKG_END)
-		printf("Sending END control package.\n");
-	else
-		printf("WARNING: Sending UNKNOWN control package (C = %d).\n", C);
+	if (DEBUG_MODE) {
+		if (C == CTRL_PKG_START)
+			printf("Sending START control package.\n");
+		else if (C == CTRL_PKG_END)
+			printf("Sending END control package.\n");
+		else
+			printf("WARNING: Sending UNKNOWN control package (C = %d).\n", C);
+	}
 
 	// calculate control package size
 	int packageSize = 5 + strlen(fileSize) + strlen(fileName);
@@ -245,8 +290,10 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 		controlPackage[pos++] = fileName[i];
 
 	if (C == CTRL_PKG_START) {
+		printf("\n");
 		printf("File: %s\n", fileName);
 		printf("Size: %s (bytes)\n", fileSize);
+		printf("\n");
 	}
 
 	// send control package
@@ -258,12 +305,14 @@ int sendControlPackage(int fd, int C, char* fileSize, char* fileName) {
 		return 0;
 	}
 
-	if (C == CTRL_PKG_START)
-		printf("START control package sent.\n");
-	else if (C == CTRL_PKG_END)
-		printf("END control package sent.\n");
-	else
-		printf("WARNING: UNKNOWN control package sent (C = %d).\n", C);
+	if (DEBUG_MODE) {
+		if (C == CTRL_PKG_START)
+			printf("START control package sent.\n");
+		else if (C == CTRL_PKG_END)
+			printf("END control package sent.\n");
+		else
+			printf("WARNING: UNKNOWN control package sent (C = %d).\n", C);
+	}
 
 	return 1;
 }
@@ -281,10 +330,12 @@ int receiveControlPackage(int fd, int* controlPackageType, int* fileLength,
 
 	// process control package type
 	*controlPackageType = package[0];
+
 	if (*controlPackageType == CTRL_PKG_END) {
-		printf("END control package has been received.\n");
+		if (DEBUG_MODE)
+			printf("END control package has been received.\n");
 		return 1;
-	} else
+	} else if (DEBUG_MODE)
 		printf("START control package has been received.\n");
 
 	ui i = 0, numParams = 2, pos = 1, numOcts = 0;

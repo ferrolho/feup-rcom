@@ -4,13 +4,18 @@
 #include <unistd.h>
 #include "Aplication.h"
 #include "CLI.h"
+#include "Utilities.h"
+
+const int DEFAULT_BAUDRATE = B38400;
+const int DEFAULT_MESSAGE_DATA_MAX_SIZE = 512;
+const int DEFAULT_NUM_RETRIES = 3;
+const int DEFAULT_TIMEOUT = 3;
 
 static void printUsage(char* argv0);
 static int procArgs(int argc, char** argv);
-static void printArguments(ConnnectionMode mode, char* port, char* file);
 
 int main(int argc, char** argv) {
-	if (argc != 1 && argc != 4) {
+	if (argc != 1 && argc != 5) {
 		printf("ERROR: Wrong number of arguments.\n");
 		printUsage(argv[0]);
 		return 1;
@@ -18,7 +23,7 @@ int main(int argc, char** argv) {
 
 	if (argc == 1)
 		startCLI();
-	else if (argc == 4)
+	else if (argc == 5)
 		procArgs(argc, argv);
 
 	return 0;
@@ -26,12 +31,12 @@ int main(int argc, char** argv) {
 
 static void printUsage(char* argv0) {
 	printf("Usage: %s\n", argv0);
-	printf("       %s <send|receive> <port> <file>\n", argv0);
+	printf("       %s <send|receive> <port> <file> <debugging>\n", argv0);
 }
 
 static int procArgs(int argc, char** argv) {
 	ConnnectionMode mode;
-	char *port, *file;
+	char *port, *file, *debug;
 
 	if (strncmp(argv[1], "send", strlen("send")) == 0)
 		mode = SEND;
@@ -45,28 +50,16 @@ static int procArgs(int argc, char** argv) {
 
 	port = argv[2];
 	file = argv[3];
+	debug = argv[4];
 
-	printArguments(mode, port, file);
+	if (strcmp(debug, "on") == 0) {
+		DEBUG_MODE = TRUE;
+		printf("! DEBUGGING ON !\n");
+	}
 
-	initApplicationLayer(port, mode, B38400, file);
+	initApplicationLayer(port, mode, DEFAULT_BAUDRATE,
+			DEFAULT_MESSAGE_DATA_MAX_SIZE, DEFAULT_NUM_RETRIES, DEFAULT_TIMEOUT,
+			file);
 
 	return 0;
-}
-
-static void printArguments(ConnnectionMode mode, char* port, char* file) {
-	printf("-------------------------\n");
-	switch (mode) {
-	case SEND:
-		printf("- Mode: Send.\t\t-\n");
-		break;
-	case RECEIVE:
-		printf("- Mode: Receive.\t-\n");
-		break;
-	default:
-		printf("- ERROR: Mode: Default.\t-\n");
-		break;
-	}
-	printf("- Port: %s.\t-\n", port);
-	printf("- File: %s.\t-\n", file);
-	printf("-------------------------\n");
 }

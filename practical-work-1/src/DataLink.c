@@ -16,12 +16,6 @@ const int ESCAPE = 0x7D;
 
 LinkLayer* ll;
 
-// TODO change this
-int numRetries = 3;
-#define MAX_FRAME_SIZE 256
-
-const int DEBUG_STATE_MACHINE = FALSE;
-
 int getBaudrate(int baudrate) {
 	switch (baudrate) {
 	case 0:
@@ -69,14 +63,16 @@ int getBaudrate(int baudrate) {
 	}
 }
 
-int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate) {
+int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate,
+		int messageDataMaxSize, int numRetries, int timeout) {
 	ll = (LinkLayer*) malloc(sizeof(LinkLayer));
 
 	strcpy(ll->port, port);
 	ll->mode = mode;
 	ll->baudRate = baudrate;
+	ll->messageDataMaxSize = messageDataMaxSize;
 	ll->ns = 0;
-	ll->timeout = 3;
+	ll->timeout = timeout;
 	ll->numTries = 1 + numRetries;
 
 	if (!saveCurrentPortSettingsAndSetNewTermios()) {
@@ -130,7 +126,8 @@ int setNewTermios() {
 	if (tcsetattr(al->fd, TCSANOW, &ll->newtio) != 0)
 		return 0;
 
-	printf("New termios structure set.\n");
+	if (DEBUG_MODE)
+		printf("New termios structure set.\n");
 
 	return 1;
 }
@@ -393,7 +390,8 @@ int sendCommand(int fd, Command command) {
 
 	free(commandBuf);
 
-	// printf("Sent command: %s.\n", commandStr);
+	if (DEBUG_MODE)
+		printf("Sent command: %s.\n", commandStr);
 
 	return successfullySentCommand;
 }
@@ -480,7 +478,7 @@ Message* receiveMessage(int fd) {
 	State state = START;
 
 	ui size = 0;
-	unsigned char* message = malloc(MAX_FRAME_SIZE);
+	unsigned char* message = malloc(ll->messageDataMaxSize);
 
 	volatile int done = FALSE;
 	while (!done) {
@@ -493,7 +491,8 @@ Message* receiveMessage(int fd) {
 
 			// if nothing was read
 			if (!numReadBytes) {
-				// printf("ERROR: nothing received.\n");
+				if (DEBUG_MODE)
+					printf("ERROR: nothing received.\n");
 
 				free(message);
 
@@ -507,7 +506,7 @@ Message* receiveMessage(int fd) {
 		switch (state) {
 		case START:
 			if (c == FLAG) {
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("START: FLAG received. Going to FLAG_RCV.\n");
 
 				message[size++] = c;
@@ -517,7 +516,7 @@ Message* receiveMessage(int fd) {
 			break;
 		case FLAG_RCV:
 			if (c == A) {
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("FLAG_RCV: A received. Going to A_RCV.\n");
 
 				message[size++] = c;
@@ -531,7 +530,7 @@ Message* receiveMessage(int fd) {
 			break;
 		case A_RCV:
 			if (c != FLAG) {
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("A_RCV: C received. Going to C_RCV.\n");
 
 				message[size++] = c;
@@ -549,21 +548,21 @@ Message* receiveMessage(int fd) {
 			break;
 		case C_RCV:
 			if (c == (message[1] ^ message[2])) {
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("C_RCV: BCC received. Going to BCC_OK.\n");
 
 				message[size++] = c;
 
 				state = BCC_OK;
 			} else if (c == FLAG) {
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("C_RCV: FLAG received. Going back to FLAG_RCV.\n");
 
 				size = 1;
 
 				state = FLAG_RCV;
 			} else {
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("C_RCV: ? received. Going back to START.\n");
 
 				size = 0;
@@ -580,7 +579,7 @@ Message* receiveMessage(int fd) {
 
 				state = STOP;
 
-				if (DEBUG_STATE_MACHINE)
+				if (DEBUG_MODE)
 					printf("BCC_OK: FLAG received. Going to STOP.\n");
 			} else if (c != FLAG) {
 				if (msg->type == INVALID)
@@ -592,10 +591,10 @@ Message* receiveMessage(int fd) {
 				}
 
 				// if writing at the end and more bytes will still be received
-				if (size % MAX_FRAME_SIZE == 0) {
-					int m = size / MAX_FRAME_SIZE + 1;
+				if (size % ll->messageDataMaxSize == 0) {
+					int mFactor = size / ll->messageDataMaxSize + 1;
 					message = (unsigned char*) realloc(message,
-							m * MAX_FRAME_SIZE);
+							mFactor * ll->messageDataMaxSize);
 				}
 
 				message[size++] = c;
@@ -636,7 +635,9 @@ Message* receiveMessage(int fd) {
 
 		char commandStr[MAX_SIZE];
 		getCommandControlField(commandStr, msg->command);
-		// printf("Received command: %s.\n", commandStr);
+
+		if (DEBUG_MODE)
+			printf("Received command: %s.\n", commandStr);
 
 		if (msg->command == RR || msg->command == REJ)
 			msg->nr = (controlField >> 7) & BIT(0);

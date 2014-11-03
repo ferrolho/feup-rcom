@@ -15,10 +15,12 @@ typedef struct {
 	char* fileName;
 } ApplicationLayer;
 
+extern int DEBUG_MODE;
 extern ApplicationLayer* al;
 
 int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
-		char* file);
+		int messageDataMaxSize, int numRetries, int timeout, char* file);
+void printConnectionInfo();
 int startConnection();
 
 int sendFile();

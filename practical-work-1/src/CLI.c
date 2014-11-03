@@ -18,13 +18,25 @@ void startCLI() {
 	ConnnectionMode mode = getIntInput(1, 2) - 1;
 	printf("\n");
 
-	int intBaudrate;
+	int baudrate;
 	do {
 		printf(
 				"What Baud rate should be used? { 0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800 } ");
-		intBaudrate = getIntInput(0, 460800);
-	} while (intBaudrate == -1);
-	int baudrate = getBaudrate(intBaudrate);
+		baudrate = getBaudrate(getIntInput(0, 460800));
+		printf("\n");
+	} while (baudrate == -1);
+
+	printf("Which should be the message data maximum size? ");
+	int messageDataMaxSize = getIntInput(1, 512);
+	printf("\n");
+
+	printf(
+			"Which is the maximum number of retries before aborting the connection? ");
+	int numRetries = getIntInput(0, 10);
+	printf("\n");
+
+	printf("How many seconds should the program wait until a time-out? ");
+	int timeout = getIntInput(1, 10);
 	printf("\n");
 
 	printf("What port - x - should be used? (/dev/ttySx) ");
@@ -48,8 +60,10 @@ void startCLI() {
 	}
 
 	char* file = getStringInput();
+	printf("\n");
 
-	initApplicationLayer(port, mode, baudrate, file);
+	initApplicationLayer(port, mode, baudrate, messageDataMaxSize, numRetries,
+			timeout, file);
 }
 
 int getIntInput(int start, int end) {

@@ -22,6 +22,7 @@ int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
 		int messageDataMaxSize, int numRetries, int timeout, char* file);
 void printConnectionInfo();
 int startConnection();
+void printConnectionStatistics();
 
 int sendFile();
 int receiveFile();

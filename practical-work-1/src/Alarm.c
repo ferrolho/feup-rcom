@@ -12,6 +12,7 @@ void alarmHandler(int signal) {
 		return;
 
 	alarmWentOff = TRUE;
+	ll->stats->timeouts++;
 	printf("Connection time out!\n\nRetrying:\n");
 
 	alarm(ll->timeout);

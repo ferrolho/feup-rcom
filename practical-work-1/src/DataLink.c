@@ -84,6 +84,18 @@ int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate,
 	return 1;
 }
 
+Statistics* initStatistics() {
+	Statistics* stats = (Statistics*) malloc(sizeof(Statistics));
+
+	stats->sentMessages = 0;
+	stats->receivedMessages = 0;
+	stats->timeouts = 0;
+	stats->numSentREJ = 0;
+	stats->numReceivedREJ = 0;
+
+	return stats;
+}
+
 int saveCurrentPortSettingsAndSetNewTermios() {
 	if (!saveCurrentTermiosSettings()) {
 		printf("ERROR: Could not save current termios settings.\n");
@@ -390,6 +402,9 @@ int sendCommand(int fd, Command command) {
 
 	free(commandBuf);
 
+	if (command == REJ)
+		ll->stats->numSentREJ++;
+
 	if (DEBUG_MODE)
 		printf("Sent command: %s.\n", commandStr);
 
@@ -466,6 +481,8 @@ int sendMessage(int fd, const unsigned char* message, ui messageSize) {
 		perror("ERROR: error while sending message.\n");
 
 	free(msg);
+
+	ll->stats->sentMessages++;
 
 	return numWrittenBytes == messageSize;
 }
@@ -641,6 +658,9 @@ Message* receiveMessage(int fd) {
 
 		if (msg->command == RR || msg->command == REJ)
 			msg->nr = (controlField >> 7) & BIT(0);
+
+		if (msg->command == REJ)
+			ll->stats->numReceivedREJ++;
 	} else if (msg->type == DATA) {
 		msg->data.messageSize = size - MESSAGE_SIZE;
 
@@ -663,6 +683,8 @@ Message* receiveMessage(int fd) {
 		// copy message
 		msg->data.message = malloc(msg->data.messageSize);
 		memcpy(msg->data.message, &message[4], msg->data.messageSize);
+
+		ll->stats->receivedMessages++;
 	}
 
 	free(message);

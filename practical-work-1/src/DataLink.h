@@ -44,6 +44,16 @@ typedef struct {
 } Message;
 
 typedef struct {
+	int sentMessages;
+	int receivedMessages;
+
+	int timeouts;
+
+	int numSentREJ;
+	int numReceivedREJ;
+} Statistics;
+
+typedef struct {
 	// port /dev/ttySx
 	char port[20];
 
@@ -69,6 +79,8 @@ typedef struct {
 
 	// old and new termios
 	struct termios oldtio, newtio;
+
+	Statistics* stats;
 } LinkLayer;
 
 extern LinkLayer* ll;
@@ -77,6 +89,7 @@ int getBaudrate(int baudrate);
 
 int initLinkLayer(const char* port, ConnnectionMode mode, int baudrate,
 		int messageDataMaxSize, int timeout, int numRetries);
+Statistics* initStatistics();
 
 int saveCurrentPortSettingsAndSetNewTermios();
 int saveCurrentTermiosSettings();

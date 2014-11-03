@@ -44,6 +44,8 @@ int initApplicationLayer(const char* port, ConnnectionMode mode, int baudrate,
 	if (!closeSerialPort(al->fd))
 		return 0;
 
+	printConnectionStatistics();
+
 	return 1;
 }
 
@@ -91,6 +93,20 @@ int startConnection() {
 	}
 
 	return 1;
+}
+
+void printConnectionStatistics() {
+	printf("=========================\n");
+	printf("= Connection statistics =\n");
+	printf("=========================\n");
+
+	printf("# Sent messages: %d\n", ll->stats->sentMessages);
+	printf("# Received messages: %d\n", ll->stats->receivedMessages);
+	printf("# Time-outs: %d\n", ll->stats->timeouts);
+	printf("# Sent REJ: %d\n", ll->stats->numSentREJ);
+	printf("# Received REJ: %d\n", ll->stats->numReceivedREJ);
+
+	printf("\n");
 }
 
 int sendFile() {

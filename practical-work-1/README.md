@@ -15,3 +15,7 @@ On the other terminal, run a similar command to start **transferring** the file:
 ```
 sudo ./nserial send /dev/ttyS4 pinguim.gif off
 ```
+
+#Screenshots
+[!img](http://i.imgur.com/HfhPFNv.png)
+[!img](http://i.imgur.com/yCCGbe8.png)

@@ -20,11 +20,18 @@ int main(int argc, char** argv) {
 
 	printf("\n%s\n", url.ip);
 
+	ftp ftp;
+	ftpConnect(&ftp, url.ip, 21);
+
+	const char* user = strlen(url.user) ? url.user : "anonymous";
+	const char* password = strlen(url.password) ? url.password : "anonymous@fe.up.pt";
+
+	//TODO create a function read and send to organize code in login and connect
+	ftpLogin(&ftp, user, password);
+
 	return 0;
 }
 
 void printUsage(char* argv0) {
     printf("Usage: %s ftp://[<user>:<password>@]<host>/<url-path>\n", argv0);
 }
-
-

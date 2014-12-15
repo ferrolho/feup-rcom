@@ -13,23 +13,34 @@ void deleteURL(url* url) {
 }
 
 const char* regExpression =
-		"ftp://(([A-Za-z0-9])*:([A-Za-z0-9])*@)*([A-Za-z0-9.~-])+/([[A-Za-z0-9/~._-])+";
+		"ftp://([([A-Za-z0-9])*:([A-Za-z0-9])*@])*([A-Za-z0-9.~-])+/([[A-Za-z0-9/~._-])+";
+
+const char* regExprAnony = "ftp://([A-Za-z0-9.~-])+/([[A-Za-z0-9/~._-])+";
 
 int parseURL(url* url, const char* urlStr) {
-	char* tempURL, *element;
+	char* tempURL, *element, *activeExpression;
 	regex_t* regex;
 	size_t nmatch = strlen(urlStr);
 	regmatch_t pmatch[nmatch];
+	int userPassMode;
 
 	element = (char*) malloc(strlen(urlStr));
 	tempURL = (char*) malloc(strlen(urlStr));
 
 	memcpy(tempURL, urlStr, strlen(urlStr));
 
+	if (tempURL[6] == '[') {
+		userPassMode = 1;
+		activeExpression = (char*) regExpression;
+	} else {
+		userPassMode = 0;
+		activeExpression = (char*) regExprAnony;
+	}
+
 	regex = (regex_t*) malloc(sizeof(regex_t));
 
 	int reti;
-	if ((reti = regcomp(regex, regExpression, REG_EXTENDED)) != 0) {
+	if ((reti = regcomp(regex, activeExpression, REG_EXTENDED)) != 0) {
 		perror("URL format is wrong.");
 		return 1;
 	}
@@ -44,13 +55,19 @@ int parseURL(url* url, const char* urlStr) {
 	// removing ftp:// from string
 	strcpy(tempURL, tempURL + 6);
 
-	// saving username
-	strcpy(element, processElementUntilChar(tempURL, ':'));
-	memcpy(url->user, element, strlen(element));
+	if (userPassMode) {
+		//removing [ from string
+		strcpy(tempURL, tempURL + 1);
 
-	//saving password
-	strcpy(element, processElementUntilChar(tempURL, '@'));
-	memcpy(url->password, element, strlen(element));
+		// saving username
+		strcpy(element, processElementUntilChar(tempURL, ':'));
+		memcpy(url->user, element, strlen(element));
+
+		//saving password
+		strcpy(element, processElementUntilChar(tempURL, '@'));
+		memcpy(url->password, element, strlen(element));
+		strcpy(tempURL, tempURL + 1);
+	}
 
 	//saving host
 	strcpy(element, processElementUntilChar(tempURL, '/'));
@@ -79,7 +96,7 @@ int parseURL(url* url, const char* urlStr) {
 	free(tempURL);
 	free(element);
 
-	//printf("\n%s\n%s\n%s\n%s\n%s\n", url->user, url->password, url->host, url->path, url->filename);
+	//printf("\n%s\n%s\n%s\n%s\n%s\n", url->user, url->password, url->host,	url->path, url->filename);
 
 	return 0;
 }

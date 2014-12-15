@@ -5,7 +5,7 @@
 static void printUsage(char* argv0);
 
 int main(int argc, char** argv) {
-	if (argc != 2) {
+	if (argc != 2 && argc != 3) {
 		printf("WARNING: Wrong number of arguments.\n");
 		printUsage(argv[0]);
 		return 1;
@@ -28,8 +28,9 @@ int main(int argc, char** argv) {
 	printf("\nThe IP received to %s was %s\n", url.host, url.ip);
 
 	///////////// FTP CLIENT PROCESS /////////////
+
 	ftp ftp;
-	ftpConnect(&ftp, url.ip, 21);
+	ftpConnect(&ftp, url.ip, url.port);
 
 	// Verifying username
 	const char* user = strlen(url.user) ? url.user : "anonymous";

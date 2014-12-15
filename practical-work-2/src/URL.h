@@ -23,6 +23,7 @@ typedef struct URL {
 	url_content ip;
 	url_content path;
 	url_content filename;
+	int port;
 } url;
 
 void initURL(url* url);

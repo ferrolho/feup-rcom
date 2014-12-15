@@ -6,6 +6,7 @@ void initURL(url* url) {
 	memset(url->host, 0, sizeof(url_content));
 	memset(url->path, 0, sizeof(url_content));
 	memset(url->filename, 0, sizeof(url_content));
+	url->port = 21;
 }
 
 void deleteURL(url* url) {

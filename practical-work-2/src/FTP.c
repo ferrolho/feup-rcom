@@ -204,7 +204,7 @@ int ftpDisconnect(ftp* ftp) {
 		return 1;
 	}
 
-	if(ftp->control_socket_fd)
+	if (ftp->control_socket_fd)
 		close(ftp->control_socket_fd);
 
 	return 0;
@@ -224,16 +224,13 @@ int ftpSend(ftp* ftp, const char* str, size_t size) {
 }
 
 int ftpRead(ftp* ftp, char* str, size_t size) {
-	int bytes;
+	FILE* fp = fdopen(ftp->control_socket_fd, "r");
 
-	if ((bytes = read(ftp->control_socket_fd, str, size)) <= 0) {
-		printf("WARNING: Nothing was read.\n");
-		return 1;
-	}
-
-	str[bytes] = '\0';
-
-	printf("Bytes read: %d\nInfo: %s\n", bytes, str);
+	do {
+		memset(str, 0, size);
+		str = fgets(str, size, fp);
+		printf("%s", str);
+	} while (!('1' <= str[0] && str[0] <= '5') || str[3] != ' ');
 
 	return 0;
 }

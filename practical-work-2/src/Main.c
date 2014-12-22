@@ -5,7 +5,7 @@
 static void printUsage(char* argv0);
 
 int main(int argc, char** argv) {
-	if (argc != 2 && argc != 3) {
+	if (argc != 2) {
 		printf("WARNING: Wrong number of arguments.\n");
 		printUsage(argv[0]);
 		return 1;
@@ -64,14 +64,14 @@ int main(int argc, char** argv) {
 
 	ftpDisconnect(&ftp);
 
+	// free memory and close program
+	deleteURL(&url);
+
 	return 0;
 }
 
 void printUsage(char* argv0) {
 	printf("\nUsage1 Normal: %s ftp://[<user>:<password>@]<host>/<url-path>\n",
 			argv0);
-	printf("Usage2 Anonymous: %s ftp://<host>/<url-path>\n", argv0);
-	printf(
-			"Usage3 Port: %s ftp://[<user>:<password>@]<host>/<url-path> <port>\n\n",
-			argv0);
+	printf("Usage2 Anonymous: %s ftp://<host>/<url-path>\n\n", argv0);
 }

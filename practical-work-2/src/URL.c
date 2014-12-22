@@ -10,6 +10,11 @@ void initURL(url* url) {
 }
 
 void deleteURL(url* url) {
+	free(url->filename);
+	free(url->path);
+	free(url->host);
+	free(url->password);
+	free(url->user);
 	free(url);
 }
 

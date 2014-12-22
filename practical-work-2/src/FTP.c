@@ -51,7 +51,6 @@ int ftpLogin(ftp* ftp, const char* user, const char* password) {
 
 	// username
 	sprintf(sd, "USER %s\r\n", user);
-	printf("SD: %sSize: %d\n", sd, strlen(sd));
 	if (ftpSend(ftp, sd, strlen(sd))) {
 		printf("ERROR: ftpSend failure.\n");
 		return 1;
@@ -68,7 +67,6 @@ int ftpLogin(ftp* ftp, const char* user, const char* password) {
 
 	// password
 	sprintf(sd, "PASS %s\r\n", password);
-	printf("SD: %sSize: %d\n", sd, strlen(sd));
 	if (ftpSend(ftp, sd, strlen(sd))) {
 		printf("ERROR: ftpSend failure.\n");
 		return 1;

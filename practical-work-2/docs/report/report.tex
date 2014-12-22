@@ -5,7 +5,6 @@
 \usepackage{graphicx}
 \usepackage{verbatim}
 
-
 \begin{document}
 
 \setlength{\textwidth}{16cm}
@@ -14,7 +13,7 @@
 \title{\Huge\textbf{Trabalho 2}\linebreak\linebreak\linebreak
 \LARGE{Configuração de uma rede e desenvolvimento de uma aplicação de download}\linebreak\linebreak
 \Large\textbf{Relatório Final}\linebreak\linebreak
-\includegraphics[scale=0.1]{feup-logo.png}\linebreak\linebreak\linebreak
+\includegraphics[scale=0.1]{res/feup-logo.png}\linebreak\linebreak\linebreak
 \Large{Mestrado Integrado em Engenharia Informática e Computação} \linebreak\linebreak
 \Large{Redes de Computadores}
 }
@@ -65,17 +64,83 @@ Este relatório divide-se em:
 
 - \textbf{Conclusões}, onde são redigidas as últimas análises e opinião final do grupo ao projecto;
 
-- \textbf{Bibliografia}, onde são colocados todos os postos de consulta efectuados pelo grupo;
+- \textbf{Bibliografia}, onde são colocados todos os documentos/\textit{sites} de consulta efectuados pelo grupo;
 
 - \textbf{Anexos}, onde será colocado o código relativo à aplicação, comandos de configuração e \textit{logs} gravados.\linebreak
 
 Antes de prosseguir é de referir que o grupo desenvolveu este projecto em ambiente LINUX, com a linguagem de programação C.
 
 \section{Parte 1 - Aplicação de download}
-Por fazer.
+Uma das componentes do segundo projecto de Redes de Computadores era o desenvolvimento de uma aplicação de download na linguagem de programação C. Para a sua implementação o grupo teve de estudar vários documentos, nomeadamente o RFC959 que aborda o protocolo de transferência de ficheiros (FTP)  e o RFC1738 que informa sobre o uso de \textit{URL's} e o seu devido tratamento.
+
+De seguida iremos descrever resumidamente o plano de implementação do programa e quais as suas funcionalidades, assim como a apresentação de resultados e a sua análise.
 
 \subsection{Arquitetura}
-Por fazer.
+Para a implementação da aplicação o grupo decidiu criar duas camadas para a aplicação, a de processamento do URL e a do cliente FTP.
+Em cada camada exite uma estrutura contendo as propriedades necessárias às funções que desempenharão.
+Porém antes de avançarmos é necessário descrever a execução do programa e quais os argumentos que aceita. Eles são dois: nome do programa e \textit{link}, podendo este ser com \textit{username} e \textit{password} ou  sem (\textit{anonymous}).
+
+\begin{figure}[h!]
+\includegraphics[scale=0.5]{res/usage.png}
+\caption{Application usage.}
+\end{figure}
+
+A estrutura URL criada pelo grupo irá ser responsável pelo processamento do segundo argumento passado na execução, mas primeiro apresentamos a estrutura em questão que contém diversas \textit{strings} que serão preenchidas com os diferentes dados presentes no link: \textit{user}, \textit{password}, \textit{hostname}, \textit{path} e \textit{filename}. Após o processamento do URL o atributo \textit{ip} será preenchido, já o atributo \textit{port} é sempre 21, número da porta de controlo do protocolo FTP.
+
+\begin{figure}[h!]
+\centering
+\includegraphics[scale=0.5]{res/url-struct.png}
+\caption{URL struct.}
+\end{figure}
+
+As funções características desta camada são as apresentadas de seguida.
+\pagebreak
+
+\begin{figure}[h!]
+\includegraphics[scale=0.5]{res/url-functions.png}
+\caption{URL functions.}
+\end{figure}
+
+Uma breve descrição às funções que constituem esta estrutura seria:
+
+- \textbf{initURL} instancia o objecto e aloca memória para os seus atributos;
+
+- \textbf{deleteURL} liberta a memória armazenada anteriormente;
+
+- \textbf{parseURL} processa o \textit{link} enviado como segundo argumento do programa e guarda a informação nos respectivos atributos de \textit{url};
+
+- \textbf{getIpByHost} obtém o IP a partir de um hostname passado como argumento. Este processo deve-se à função \textit{gethostbyname} que retorna uma estrutura do tipo \textit{hostent} que será usada na função \textit{inet\_ntoa} através de uma cast para uma estrutura do tipo \textit{in\_addr} e será devolvido um \textit{char$*$} no formato de números e pontos representando o IP.
+
+A função \textbf{processElementUntilChar} processa uma sub-string até certo caracter passado como argumento.\linebreak
+
+No que diz respeito à estrutura do cliente FTP apenas dois atributos são necessários: descritor de ficheiros para o controlo e para os dados.
+
+\begin{figure}[h!]
+\includegraphics[scale=0.5]{res/ftp-struct.png}
+\caption{FTP Client struct.}
+\end{figure}
+
+Após o processamento do \textit{URL} estar concluído, é necessário ligar o cliente FTP através de um socket TPC ao servidor em questão, neste caso FTP. Para isso utiliza-se a função \textbf{ftpConnect}. Com uma ligação realizada com sucesso foi preciso ter cuidado com a ordem correcta dos comandos a passar ao servidor para iniciar a transferência do ficheiro. Seguindo o protocolo FTP e a primeira aula laboratorial o grupo estabeleceu uma ordem de comandos a enviar que será analisada na apresentação de resultados desta parte. A ordem pela qual a comunicação foi feita foi:
+
+ -\textbf{USER user}, em que é enviado o nome do utilizador;
+ 
+ -\textbf{PASS pass}, onde o utilizador envia a password para o servidor;
+ 
+ -\textbf{CWD path}, permite ao servidor alterar o directório em que se encontra indo para o correcto onde se encontra o ficheiro;
+ 
+ -\textbf{PASV}, entrada em modo passivo, permitindo uma mútua comunicação entre o servidor e o cliente FTP. É também feita nova conexão do socket mas desta vez a uma porta processada com informação recebida do servidor, sendo guardada no descritor de dados do cliente FTP;
+ 
+ -\textbf{RETR filename}, onde é pedido ao servidor o envio do ficheiro para download.
+ 
+Ao fim de realizados estes passos a transferência do ficheiro desejado pelo utilizador tem o seu início. As funções utilizadas para estas comunicações entre o cliente FTP e o servidor são as seguintes.
+
+\begin{figure}[h!]
+\centering
+\includegraphics[scale=0.5]{res/ftp-functions.png}
+\caption{FTP Client functions.}
+\end{figure}
+
+Um ponto importante a frisar na comunicação das duas camadas é que o cliente FTP recorre aos atributos do URL previemente formado para executar todas as acções de comunicação e posterior transferência de ficheiro, não existindo mais nenhuma relação entre ambas.
 
 \subsection{Resultados de download}
 Por fazer.

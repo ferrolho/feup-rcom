@@ -49,23 +49,32 @@ int main(int argc, char** argv) {
 		strncat(password, buf, strlen(buf) - 1);
 	}
 
-	ftpLogin(&ftp, user, password);
+	// Sending credentials to server
+	if(ftpLogin(&ftp, user, password)) {
+		printf("ERROR: Cannot login user %s\n", user);
+		return -1;
+	}
 
-	char path[1024] = "";
-	strcat(path, url.path);
+	// Changing directory
+	if(ftpCWD(&ftp, url.path)) {
+		printf("ERROR: Cannot change directory to the folder of %s\n", url.filename);
+		return -1;
+	}
 
-	ftpCWD(&ftp, path);
+	// Entry in passive mode
+	if(ftpPasv(&ftp)) {
+		printf("ERROR: Cannot entry in passive mode\n");
+		return -1;
+	}
 
-	ftpPasv(&ftp);
-
+	// Begins transmission of a file from the remote host
 	ftpRetr(&ftp, url.filename);
 
+	// Starting file transfer
 	ftpDownload(&ftp, url.filename);
 
+	// Disconnecting from server
 	ftpDisconnect(&ftp);
-
-	// free memory and close program
-	deleteURL(&url);
 
 	return 0;
 }

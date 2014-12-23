@@ -9,15 +9,6 @@ void initURL(url* url) {
 	url->port = 21;
 }
 
-void deleteURL(url* url) {
-	free(url->filename);
-	free(url->path);
-	free(url->host);
-	free(url->password);
-	free(url->user);
-	free(url);
-}
-
 const char* regExpression =
 		"ftp://([([A-Za-z0-9])*:([A-Za-z0-9])*@])*([A-Za-z0-9.~-])+/([[A-Za-z0-9/~._-])+";
 

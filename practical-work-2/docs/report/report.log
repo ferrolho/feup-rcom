@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.10.11)  23 DEC 2014 17:27
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.10.11)  23 DEC 2014 18:22
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -481,13 +481,11 @@ Package: gettitlestring 2010/12/03 v1.4 Cleanup title references (HO)
 LaTeX Info: Redefining \ref on input line 11.
 LaTeX Info: Redefining \pageref on input line 11.
 LaTeX Info: Redefining \nameref on input line 11.
-
-(./report.out) (./report.out)
 \@outlinefile=\write3
 \openout3 = `report.out'.
 
 
-<res/feup-logo.png, id=71, 2252.415pt x 742.775pt>
+<res/feup-logo.png, id=4, 2252.415pt x 742.775pt>
 File: res/feup-logo.png Graphic file (type png)
  <use res/feup-logo.png>
 Package pdftex.def Info: res/feup-logo.png used on input line 27.
@@ -505,8 +503,7 @@ Package babel Info: Redefining portuges shorthand "|
 
 [1
 
-{/home/henrique/.texmf-var/fonts/map/pdftex/updmap/pdftex.map} <./res/feup-logo
-.png>]
+{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map} <./res/feup-logo.png>]
 Underfull \hbox (badness 10000) in paragraph at lines 40--41
 
  []
@@ -567,7 +564,7 @@ Package babel Info: Redefining portuges shorthand "|
 [4]
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 81.
- <res/usage.png, id=117, 722.7pt x 134.5025pt>
+ <res/usage.png, id=66, 722.7pt x 134.5025pt>
 File: res/usage.png Graphic file (type png)
  <use res/usage.png>
 Package pdftex.def Info: res/usage.png used on input line 87.
@@ -577,7 +574,7 @@ Overfull \hbox (16.3491pt too wide) in paragraph at lines 87--88
 [][] 
  []
 
-<res/url-struct.png, id=118, 394.47375pt x 204.765pt>
+<res/url-struct.png, id=67, 394.47375pt x 204.765pt>
 File: res/url-struct.png Graphic file (type png)
  <use res/url-struct.png>
 Package pdftex.def Info: res/url-struct.png used on input line 95.
@@ -588,7 +585,7 @@ Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 101.
 
 [5 <./res/usage.png> <./res/url-struct.png>]
-<res/url-functions.png, id=125, 811.03pt x 110.4125pt>
+<res/url-functions.png, id=74, 811.03pt x 110.4125pt>
 File: res/url-functions.png Graphic file (type png)
 
 <use res/url-functions.png>
@@ -609,13 +606,13 @@ Underfull \hbox (badness 10000) in paragraph at lines 117--118
 
  []
 
-<res/ftp-struct.png, id=126, 520.94624pt x 96.36pt>
+<res/ftp-struct.png, id=75, 520.94624pt x 96.36pt>
 File: res/ftp-struct.png Graphic file (type png)
  <use res/ftp-struct.png>
 Package pdftex.def Info: res/ftp-struct.png used on input line 122.
 (pdftex.def)             Requested size: 260.47249pt x 48.17987pt.
 
-<res/ftp-functions.png, id=127, 526.96875pt x 182.6825pt>
+<res/ftp-functions.png, id=76, 526.96875pt x 182.6825pt>
 File: res/ftp-functions.png Graphic file (type png)
 
 <use res/ftp-functions.png>
@@ -637,7 +634,7 @@ Package babel Info: Redefining portuges shorthand "|
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 152.
 
-<res/image1.jpg, id=135, 412.54124pt x 205.76875pt>
+<res/image1.jpg, id=84, 412.54124pt x 205.76875pt>
 File: res/image1.jpg Graphic file (type jpg)
  <use res/image1.jpg>
 Package pdftex.def Info: res/image1.jpg used on input line 159.
@@ -651,7 +648,7 @@ Package babel Info: Redefining portuges shorthand "|
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 169.
 
-<res/image3.jpg, id=145, 744.7825pt x 442.65375pt>
+<res/image3.jpg, id=94, 744.7825pt x 442.65375pt>
 File: res/image3.jpg Graphic file (type jpg)
  <use res/image3.jpg>
 Package pdftex.def Info: res/image3.jpg used on input line 177.
@@ -662,8 +659,7 @@ Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 189.
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 189.
-
-[8 <./res/image3.jpg>]
+ [8 <./res/image3.jpg>]
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 193.
 Package babel Info: Redefining portuges shorthand "|
@@ -672,7 +668,7 @@ Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 204.
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 204.
- [9] <res/image4.jpg, id=155, 567.11874pt x 138.5175pt>
+ [9] <res/image4.jpg, id=104, 567.11874pt x 138.5175pt>
 File: res/image4.jpg Graphic file (type jpg)
 
 <use res/image4.jpg>
@@ -710,7 +706,7 @@ Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 247.
 Package babel Info: Redefining portuges shorthand "|
 (babel)             in language  on input line 250.
-<res/image2.png, id=161, 1445.4pt x 903.375pt>
+<res/image2.png, id=109, 1445.4pt x 903.375pt>
 File: res/image2.png Graphic file (type png)
  <use res/image2.png>
 Package pdftex.def Info: res/image2.png used on input line 255.
@@ -732,15 +728,22 @@ Package atveryend Info: Empty hook `AfterLastShipout' on input line 259.
  (./report.aux)
 Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 259.
 Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 259.
-Package rerunfilecheck Info: File `report.out' has not changed.
-(rerunfilecheck)             Checksum: 05F08C1317B0EA5DA3858ECD0945D8C0;1279.
+
+
+Package rerunfilecheck Warning: File `report.out' has changed.
+(rerunfilecheck)                Rerun to get outlines right
+(rerunfilecheck)                or use package `bookmark'.
+
+Package rerunfilecheck Info: Checksums for `report.out':
+(rerunfilecheck)             Before: <no file>
+(rerunfilecheck)             After:  05F08C1317B0EA5DA3858ECD0945D8C0;1279.
 Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 259.
  ) 
 Here is how much of TeX's memory you used:
- 5851 strings out of 494963
- 85236 string characters out of 6179646
+ 5830 strings out of 494963
+ 84958 string characters out of 6179646
  171651 words of memory out of 5000000
- 8972 multiletter control sequences out of 15000+600000
+ 8955 multiletter control sequences out of 15000+600000
  9206 words of font info for 32 fonts, out of 8000000 for 9000
  38 hyphenation exceptions out of 8191
  29i,7n,32p,1538b,339s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -753,10 +756,10 @@ ist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fon
 ts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type
 1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
 ic/amsfonts/cm/cmti10.pfb>
-Output written on report.pdf (11 pages, 537913 bytes).
+Output written on report.pdf (11 pages, 536877 bytes).
 PDF statistics:
- 205 PDF objects out of 1000 (max. 8388607)
- 170 compressed objects within 2 object streams
+ 153 PDF objects out of 1000 (max. 8388607)
+ 118 compressed objects within 2 object streams
  36 named destinations out of 1000 (max. 500000)
- 187 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 51 words of extra memory for PDF output out of 10000 (max. 10000000)
 

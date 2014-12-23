@@ -27,7 +27,6 @@ typedef struct URL {
 } url;
 
 void initURL(url* url);
-void deleteURL(url* url);
 int parseURL(url* url, const char* str); // Parse a string with the url to create the URL structure
 int getIpByHost(url* url); // gets an IP by host name
 

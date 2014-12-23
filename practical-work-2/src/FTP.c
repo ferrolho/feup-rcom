@@ -129,6 +129,7 @@ int ftpPasv(ftp* ftp) {
 		return 1;
 	}
 
+	// calculating new port
 	int portResult = port1 * 256 + port2;
 
 	printf("IP: %s\n", pasv);

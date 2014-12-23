@@ -35,7 +35,7 @@
 Este relatório complementa o segundo projecto da Unidade Curricular de Redes de Computadores, do Mestrado Integrado em Engenharia Informática e de Computação. O projecto consiste na configuração de uma rede de computadores e no desenvolvimento de uma aplicação de download de um ficheiro.
 Este documento subdivide-se em diversas secções destacando-se duas delas:
 
-- A secção da aplicação de download onde é descrita a sua arquitectura e apresentados os resultados de da sua execução, assim como a sua análise; 
+- A secção da aplicação de download onde é descrita a sua arquitectura e apresentados os resultados da sua execução, assim como a sua análise; 
 
 - A secção de configuração da rede onde foi proposto ao grupo a realização de seis experiências tendo cada uma delas objectivos delineados e independentes.\linebreak
 
@@ -49,11 +49,11 @@ As experiências acima referidas basearam-se na configuração de um \textbf{IP 
 \section{Introdução}
 O segundo projecto de Redes de Computadores desenvolveu-se ao longo de diversas aulas laboratoriais, sendo que a primeira aula serviu para uma maior interiorização acerca de protocolos de aplicação IETF (\textit{Internet Engineering Task Force}). Esta comunidade tem como objectivo proporcionar soluções a problemas relacionados com ligações à \textit{Internet} e para tal são recomendados os documentos RFC (\textit{Request for Comments}) que descrevem padrões de protocolos da mesma.
 O protocolo usado no trabalho foi o FTP com auxílio de um servidor da faculdade, a exemplo \textit{ftp.fe.up.pt}, \textit{ftp.up.pt}, entre outros.
-Este trabalho visou o estudo de um rede de computadores, da sua configuração e posterior ligação a uma aplicação desenvolvida pelo grupo. Para tal, além de seguir as recomendações e instruções fornecidas no guião, o grupo teve de fazer pesquisas acerca do funcionamento do protocolo em questão e respectiva ligação ao servidor em uso.
+Este trabalho visou o estudo de uma rede de computadores, da sua configuração e posterior ligação a uma aplicação desenvolvida pelo grupo. Para tal, além de seguir as recomendações e instruções fornecidas no guião, o grupo teve de fazer pesquisas acerca do funcionamento do protocolo em questão e respectiva ligação ao servidor em uso.
 
 O projecto divide-se em duas grandes componentes: a configuração de uma rede e o desenvolvimento de uma aplicação de download.\linebreak
 
-O principal objectivo da configuração de rede é permitir a execução de uma aplicação, a partir de duas \textit{VLAN's} dentro de um \textit{switch}. Numa das VLAN foi implementado o NAT, estando este activo, e na outra não, tendo esta última que conseguir ter ligação à \textit{Internet} para um bom e esperado desempenho da aplicação de download.
+O principal objectivo da configuração de rede é permitir a execução de uma aplicação, a partir de duas \textit{VLAN's} dentro de um \textit{switch}. Numa das VLAN foi implementado o NAT, estando este activo, e na outra não, tendo esta última que conseguir ter ligação à \textit{Internet} para a aplicação de download funcionar correctamente.
 
 Quanto aos objectivos da aplicação de download era essencial o grupo entender o que é um cliente, um servidor e as suas especificidades em TCP/IP, saber como se caracterizam protocolos em aplicações no geral, como definir um \textit{URL} e descrever o comportamento de um servidor FTP. Com estes objectivos concluídos, o grupo poderia avançar para o desenvolvimento da aplicação implementando um cliente FTP e uma ligação TCP a partir de \textit{sockets}. Só então poderiamos concluir a importância do DNS na conversão de um \textit{URL} para um IP, permitindo a sua localização num \textit{host} com domínio determinado.\linebreak
 
@@ -79,16 +79,16 @@ Uma das componentes do segundo projecto de Redes de Computadores era o desenvolv
 De seguida iremos descrever resumidamente o plano de implementação do programa e quais as suas funcionalidades, assim como a apresentação de resultados e a sua análise.
 
 \subsection{Arquitetura}
-Para a implementação da aplicação o grupo decidiu criar duas camadas para a aplicação, a de processamento do URL e a do cliente FTP.
-Em cada camada exite uma estrutura contendo as propriedades necessárias às funções que desempenharão.
-Porém antes de avançarmos é necessário descrever a execução do programa e quais os argumentos que aceita. Eles são dois: nome do programa e \textit{link}, podendo este ser com \textit{username} e \textit{password} ou  sem (\textit{anonymous}).
+Para implementar a aplicação o grupo decidiu criar duas camadas: a de processamento do URL e a do cliente FTP.
+Em cada camada, existe uma estrutura que contém as propriedades necessárias às funções que estas desempenham.\\
+A aplicação aceita um \textit{link} como argumento, que deve ser especificado através da linha de comandos. O \textit{link} pode conter um \textit{username} e \textit{password}, ou então nenhum caso se pretenda usar o modo \textit{anonymous}.
 
 \begin{figure}[h!]
 \includegraphics[scale=0.5]{res/usage.png}
 \caption{Application usage.}
 \end{figure}
 
-A estrutura URL criada pelo grupo irá ser responsável pelo processamento do segundo argumento passado na execução, mas primeiro apresentamos a estrutura em questão que contém diversas \textit{strings} que serão preenchidas com os diferentes dados presentes no link: \textit{user}, \textit{password}, \textit{hostname}, \textit{path} e \textit{filename}. Após o processamento do URL o atributo \textit{ip} será preenchido, já o atributo \textit{port} é sempre 21, número da porta de controlo do protocolo FTP.
+A estrutura URL é responsável pelo processamento do argumento especificado na linha de comandos. Esta estrutura contém diversas \textit{strings} que são preenchidas com os diferentes dados presentes no link: \textit{user}, \textit{password}, \textit{hostname}, \textit{path} e \textit{filename}. Após o processamento do URL, o atributo \textit{ip} é preenchido. O atributo \textit{port} é sempre 21 (número da porta de controlo do protocolo FTP).
 
 \begin{figure}[h!]
 \centering
@@ -96,7 +96,7 @@ A estrutura URL criada pelo grupo irá ser responsável pelo processamento do se
 \caption{URL struct.}
 \end{figure}
 
-As funções características desta camada são as apresentadas de seguida.
+As funções características desta camada são apresentadas de seguida.
 \pagebreak
 
 \begin{figure}[h!]
@@ -104,26 +104,26 @@ As funções características desta camada são as apresentadas de seguida.
 \caption{URL functions.}
 \end{figure}
 
-Uma breve descrição às funções que constituem esta estrutura seria:
+Breve descrição das funções que constituem esta estrutura:
 
-- \textbf{initURL} instancia o objecto e aloca memória para os seus atributos;
+- \textbf{initURL}, instancia o objecto e aloca memória para os seus atributos;
 
-- \textbf{deleteURL} liberta a memória armazenada anteriormente;
+- \textbf{deleteURL}, liberta a memória alocada anteriormente;
 
-- \textbf{parseURL} processa o \textit{link} enviado como segundo argumento do programa e guarda a informação nos respectivos atributos de \textit{url};
+- \textbf{parseURL}, processa o \textit{link} enviado como argumento ao programa e guarda a informação nos respectivos atributos de \textit{url};
 
-- \textbf{getIpByHost} obtém o IP a partir de um hostname passado como argumento. Este processo deve-se à função \textit{gethostbyname} que retorna uma estrutura do tipo \textit{hostent} que será usada na função \textit{inet\_ntoa} através de uma cast para uma estrutura do tipo \textit{in\_addr} e será devolvido um \textit{char$*$} no formato de números e pontos representando o IP.
+- \textbf{getIpByHost}, obtém o IP a partir de um hostname passado como argumento. Este processo deve-se à função \textit{gethostbyname} que retorna uma estrutura do tipo \textit{hostent}, que é usada na função \textit{inet\_ntoa} através de um cast para uma estrutura do tipo \textit{in\_addr} e é devolvido um \textit{char$*$} no formato de números e pontos representando o IP.
 
-A função \textbf{processElementUntilChar} processa uma sub-string até certo caracter passado como argumento.\linebreak
+A função \textbf{processElementUntilChar} processa uma sub-string até um determinado caracter passado como argumento.\linebreak
 
-No que diz respeito à estrutura do cliente FTP apenas dois atributos são necessários: descritor de ficheiros para o controlo e para os dados.
+No que diz respeito à estrutura do cliente FTP, apenas são necessários dois atributos: um descritor de ficheiro para o controlo e outro para os dados.
 
 \begin{figure}[h!]
 \includegraphics[scale=0.5]{res/ftp-struct.png}
 \caption{FTP Client struct.}
 \end{figure}
 
-Após o processamento do \textit{URL} estar concluído, é necessário ligar o cliente FTP através de um socket TPC ao servidor em questão, neste caso FTP. Para isso utiliza-se a função \textbf{ftpConnect}. Com uma ligação realizada com sucesso foi preciso ter cuidado com a ordem correcta dos comandos a passar ao servidor para iniciar a transferência do ficheiro. Seguindo o protocolo FTP e a primeira aula laboratorial o grupo estabeleceu uma ordem de comandos a enviar que será analisada na apresentação de resultados desta parte. A ordem pela qual a comunicação foi feita foi:
+Após o processamento do \textit{URL} estar concluído, é necessário ligar o cliente FTP através de um socket TCP ao servidor em questão, neste caso FTP. Para isso utiliza-se a função \textbf{ftpConnect}. Com uma ligação realizada com sucesso foi preciso ter cuidado com a ordem correcta dos comandos a passar ao servidor para iniciar a transferência do ficheiro. Seguindo o protocolo FTP e a primeira aula laboratorial o grupo estabeleceu uma ordem de comandos a enviar que será analisada na apresentação de resultados desta parte. A ordem pela qual a comunicação foi feita foi:
 
  -\textbf{USER user}, em que é enviado o nome do utilizador;
  

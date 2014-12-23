@@ -36,4 +36,6 @@ Default
 *.project
 *.settings
 *.suppressed
+*.log
+*.aux
 

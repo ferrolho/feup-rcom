@@ -114,26 +114,26 @@ Breve descrição das funções que constituem esta estrutura:
 
 A função \textbf{processElementUntilChar} processa uma sub-string até um determinado caracter passado como argumento.\linebreak
 
-No que diz respeito à estrutura do cliente FTP, apenas são necessários dois atributos: um descritor de ficheiro para o controlo e outro para os dados.
+No que diz respeito à estrutura do cliente FTP, apenas são necessários dois atributos: um descritor de ficheiro para o socket de controlo e outro para o socket de dados.
 
 \begin{figure}[h!]
 \includegraphics[scale=0.5]{res/ftp-struct.png}
 \caption{FTP Client struct.}
 \end{figure}
 
-Após o processamento do \textit{URL} estar concluído, é necessário ligar o cliente FTP através de um socket TCP ao servidor em questão, neste caso FTP. Para isso utiliza-se a função \textbf{ftpConnect}. Com uma ligação realizada com sucesso foi preciso ter cuidado com a ordem correcta dos comandos a passar ao servidor para iniciar a transferência do ficheiro. Seguindo o protocolo FTP e a primeira aula laboratorial o grupo estabeleceu uma ordem de comandos a enviar que será analisada na apresentação de resultados desta parte. A ordem pela qual a comunicação foi feita foi:
+Após o processamento do \textit{URL} estar concluído, é necessário ligar o cliente FTP através de um socket TCP ao servidor em questão, neste caso FTP. Para isso utiliza-se a função \textbf{ftpConnect}. Seguindo o protocolo FTP, e a primeira aula laboratorial, o grupo estabeleceu uma ordem de comandos a enviar que será analisada na apresentação de resultados. A ordem pela qual a comunicação foi feita foi:
 
- -\textbf{USER user}, em que é enviado o nome do utilizador;
+ -\textbf{USER user}, o nome do utilizador é enviado;
  
  -\textbf{PASS pass}, onde o utilizador envia a password para o servidor;
  
- -\textbf{CWD path}, permite ao servidor alterar o directório em que se encontra indo para o correcto onde se encontra o ficheiro;
+ -\textbf{CWD path}, permite ao servidor alterar o diretório em que se encontra, indo para aquele onde se encontra o ficheiro;
  
- -\textbf{PASV}, entrada em modo passivo, permitindo uma mútua comunicação entre o servidor e o cliente FTP. É também feita nova conexão do socket mas desta vez a uma porta processada com informação recebida do servidor, sendo guardada no descritor de dados do cliente FTP;
+ -\textbf{PASV}, entrada em modo passivo, permitindo uma mútua comunicação entre o servidor e o cliente FTP. É também feita nova conexão do socket mas, desta vez, a uma porta processada com informação recebida do servidor, sendo guardada no descritor de dados do cliente FTP;
  
- -\textbf{RETR filename}, onde é pedido ao servidor o envio do ficheiro para download.
+ -\textbf{RETR filename}, é pedido ao servidor o envio do ficheiro para download.
  
-Ao fim de realizados estes passos a transferência do ficheiro desejado pelo utilizador tem o seu início. As funções utilizadas para estas comunicações entre o cliente FTP e o servidor são as seguintes.
+Ao fim de realizados estes passos, inicia-se a transferência do ficheiro especificado pelo utilizador. As funções responsáveis pela comunicação entre o cliente FTP e o servidor apresentam-se de seguida.
 
 \begin{figure}[h!]
 \centering

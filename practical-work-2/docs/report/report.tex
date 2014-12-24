@@ -146,7 +146,31 @@ Ao fim de realizados estes passos, inicia-se a transferência do ficheiro especi
 Um ponto importante a frisar na comunicação entre as duas camadas é que o cliente FTP recorre aos atributos do URL previamente formado para executar todas as acções de comunicação e posterior transferência do ficheiro, não existindo mais nenhuma relação entre estas.
 
 \subsection{Resultados de download}
-TODO
+Nesta secção de demonstração e análise de resultados, o grupo decidiu fazer testes em dois modos: normal, com um \textit{username} e \textit{password}, e em anónimo.
+
+Numa primeira análise o grupo irá abordar o modo anónimo com o servidor FTP da Universidade do Porto para o download de um ficheiro escolhido ao acaso.
+Para execução do programa faz-se uma introdução do comandos:
+\textit{./ftpdownloader ftp://ftp.up.pt/pub/CPAN/RECENT-1M.json} , onde será feito o download do ficheiro RECENT-1M.json.
+
+Para visualizar o resultado da execução na linha de comandos clique -$>$~\autoref{fig:anonymous}
+
+No terminal é possível verificar o pedido de \textit{email} para a entrada em modo anónimo no servidor. De seguida são enviados os comandos ao servidor para uma devida configuração antes do início da transferência. A parte do login do utilizador é assegurada pela função \textbf{\textit{ftpLogin}} do cliente FTP, prosseguida da mudança de directório do servidor com \textbf{\textit{ftpCWD}} para a pasta do ficheiro pretendido. De referir que são sempre recebidas respostas a cada comunicação entre a aplicação e o servidor. Cada mensagem é identificada por três algarismos sendo o primeiro identificador de uma resposta positiva (1-3) ou negativa (4 e 5). O segundo algarismo é de agrupamento e com codificação de informações (0-5). Já o último é um contador para as diferentes mensagens para cada grupo (isto é, dos dois primeiros algarismos; exemplo, 55 nos dois primeiros algarismos terá 4 mensagens do 0 a 4).
+De volta à demonstração e após a mudança de directório é feita a entrada em modo passivo por parte da função \textbf{\textit{ftpPasv}}, onde é processada a informação recebida e calculada uma nova porta para a transferência de dados. Na imagem são apresentados os resultados obtidos. Por fim a aplicação pede ao servidor o envio do ficheiro com \textbf{\textit{ftpRetr}} iniciando-se a transferência com \textbf{\textit{ftpDownload}}. Quando a transferência termina é recebida a mensagem \textit{226 File send OK}. O ficheiro recebido tinha tamanho de 2.3 Mb e demorou cerca de 13 segundos. O tempo porém é influenciado com a rede que a aplicação é usada, variando sempre em diferentes execuções.
+
+Para visualizar o resultado transferência clique:
+
+-$>$Antes~\autoref{fig:antesanony}
+
+-$>$Depois~\autoref{fig:depoisanony}
+
+\pagebreak
+
+De seguida apresenta-se a demonstração do download de uma música no modo normal.
+Para visualizar a sua execução no terminal clique -$>$~\autoref{fig:normal}
+
+O funcionamento do programa é igual no modo normal e no modo anónimo, sendo a única diferença o \textit{login}. Este em vez de se registar como \textit{anonymous} utiliza as credenciais que o utilizador passa como argumentos da execução.
+
+O tempo registado para a transferência deste ficheiro foi de 15 segundos, com um tamanho de 8.5 Mb. Isto serve para comprovar que o tempo nesta experiência não pode ser tomado como factor preponderante pois a sua resolução não se encontra ao alcance do grupo.
 
 Aqui ficam as imagens relativas a antes e depois da transferência.
 

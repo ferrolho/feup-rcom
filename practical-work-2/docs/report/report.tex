@@ -8,7 +8,6 @@
 \hypersetup{colorlinks=true, linkcolor=black}
 \usepackage{listings}
 
-
 \begin{document}
 
 \setlength{\textwidth}{16cm}
@@ -54,7 +53,7 @@ Este trabalho visou o estudo de uma rede de computadores, da sua configuração 
 
 O projecto divide-se em duas grandes componentes: a configuração de uma rede e o desenvolvimento de uma aplicação de download.\linebreak
 
-O principal objectivo da configuração de rede é permitir a execução de uma aplicação, a partir de duas \textit{VLAN's} dentro de um \textit{switch}. Numa das VLAN foi implementado o NAT, estando este activo, e na outra não, tendo esta última que conseguir ter ligação à \textit{Internet} para a aplicação de download funcionar correctamente.
+O principal objectivo da configuração de rede é permitir a execução de uma aplicação, a partir de duas \textit{VLANs} dentro de um \textit{switch}. Numa das VLAN foi implementado o NAT, estando este activo, e na outra não, tendo esta última que conseguir ter ligação à \textit{Internet} para a aplicação de download funcionar correctamente.
 
 Quanto aos objectivos da aplicação de download era essencial o grupo entender o que é um cliente, um servidor e as suas especificidades em TCP/IP, saber como se caracterizam protocolos em aplicações no geral, como definir um \textit{URL} e descrever o comportamento de um servidor FTP. Com estes objectivos concluídos, o grupo poderia avançar para o desenvolvimento da aplicação implementando um cliente FTP e uma ligação TCP a partir de \textit{sockets}. Só então poderiamos concluir a importância do DNS na conversão de um \textit{URL} para um IP, permitindo a sua localização num \textit{host} com domínio determinado.\linebreak
 
@@ -109,9 +108,11 @@ Breve descrição das funções que constituem esta estrutura:
 
 - \textbf{initURL}, instancia o objecto e aloca memória para os seus atributos;
 
+- \textbf{deleteURL}, liberta a memória alocada anteriormente;
+
 - \textbf{parseURL}, processa o \textit{link} enviado como argumento ao programa e guarda a informação nos respectivos atributos de \textit{url};
 
-- \textbf{getIpByHost}, obtém o IP a partir de um hostname passado como argumento. Este processo deve-se à função \textit{gethostbyname} que retorna uma estrutura do tipo \textit{hostent}, que é usada na função \textit{inet\_ntoa} através de um \textit{cast} para uma estrutura do tipo \textit{in\_addr} e é devolvido um \textit{char$*$} no formato de números e pontos representando o IP.
+- \textbf{getIpByHost}, obtém o IP a partir de um hostname passado como argumento. Este processo deve-se à função \textit{gethostbyname} que retorna uma estrutura do tipo \textit{hostent}, que é usada na função \textit{inet\_ntoa} através de um cast para uma estrutura do tipo \textit{in\_addr} e é devolvido um \textit{char$*$} no formato de números e pontos representando o IP.
 
 A função \textbf{processElementUntilChar} processa uma sub-string até um determinado caracter passado como argumento.\linebreak
 
@@ -142,34 +143,10 @@ Ao fim de realizados estes passos, inicia-se a transferência do ficheiro especi
 \caption{FTP Client functions.}
 \end{figure}
 
-Um ponto importante a frisar na comunicação das duas camadas é que o cliente FTP recorre aos atributos do URL previemente formado para executar todas as acções de comunicação e posterior transferência de ficheiro, não existindo mais nenhuma relação entre ambas.
+Um ponto importante a frisar na comunicação entre as duas camadas é que o cliente FTP recorre aos atributos do URL previamente formado para executar todas as acções de comunicação e posterior transferência do ficheiro, não existindo mais nenhuma relação entre estas.
 
 \subsection{Resultados de download}
-Nesta secção de demonstração e análise de resultados, o grupo decidiu fazer testes em dois modos: normal, com um \textit{username} e \textit{password}, e em anónimo.
-
-Numa primeira análise o grupo irá abordar o modo anónimo com o servidor FTP da Universidade do Porto para o download de um ficheiro escolhido ao acaso.
-Para execução do programa faz-se uma introdução do comandos:
-\textit{./ftpdownloader ftp://ftp.up.pt/pub/CPAN/RECENT-1M.json} , onde será feito o download do ficheiro RECENT-1M.json.
-
-Para visualizar o resultado da execução na linha de comandos clique -$>$~\autoref{fig:anonymous}
-
-No terminal é possível verificar o pedido de \textit{email} para a entrada em modo anónimo no servidor. De seguida são enviados os comandos ao servidor para uma devida configuração antes do início da transferência. A parte do login do utilizador é assegurada pela função \textbf{\textit{ftpLogin}} do cliente FTP, prosseguida da mudança de directório do servidor com \textbf{\textit{ftpCWD}} para a pasta do ficheiro pretendido. De referir que são sempre recebidas respostas a cada comunicação entre a aplicação e o servidor. Cada mensagem é identificada por três algarismos sendo o primeiro identificador de uma resposta positiva (1-3) ou negativa (4 e 5). O segundo algarismo é de agrupamento e com codificação de informações (0-5). Já o último é um contador para as diferentes mensagens para cada grupo (isto é, dos dois primeiros algarismos; exemplo, 55 nos dois primeiros algarismos terá 4 mensagens do 0 a 4).
-De volta à demonstração e após a mudança de directório é feita a entrada em modo passivo por parte da função \textbf{\textit{ftpPasv}}, onde é processada a informação recebida e calculada uma nova porta para a transferência de dados. Na imagem são apresentados os resultados obtidos. Por fim a aplicação pede ao servidor o envio do ficheiro com \textbf{\textit{ftpRetr}} iniciando-se a transferência com \textbf{\textit{ftpDownload}}. Quando a transferência termina é recebida a mensagem \textit{226 File send OK}. O ficheiro recebido tinha tamanho de 2.3 Mb e demorou cerca de 13 segundos. O tempo porém é influenciado com a rede que a aplicação é usada, variando sempre em diferentes execuções.
-
-Para visualizar o resultado transferência clique:
-
--$>$Antes~\autoref{fig:antesanony}
-
--$>$Depois~\autoref{fig:depoisanony}
-
-\pagebreak
-
-De seguida apresenta-se a demonstração do download de uma música no modo normal.
-Para visualizar a sua execução no terminal clique -$>$~\autoref{fig:normal}
-
-O funcionamento do programa é igual no modo normal e no modo anónimo, sendo a única diferença o \textit{login}. Este em vez de se registar como \textit{anonymous} utiliza as credenciais que o utilizador passa como argumentos da execução.
-
-O tempo registado para a transferência deste ficheiro foi de 15 segundos, com um tamanho de 8.5 Mb. Isto serve para comprovar que o tempo nesta experiência não pode ser tomado como factor proponderante pois a sua resolução não se encontra ao alcance do grupo.
+TODO
 
 Aqui ficam as imagens relativas a antes e depois da transferência.
 
@@ -180,66 +157,64 @@ Aqui ficam as imagens relativas a antes e depois da transferência.
 
 \section{Parte 2 - Configuração da rede e análise}
 \subsection{Experiência 1 - Configurar um IP de rede}
-A finalidade desta experiência foi a compreensão da configuração de IP’s em máquinas diferentes, de modo a que estas consigam comunicar entre si. Assim, após a configuração dos IP’s das portas eth0 de dois computadores e a adição das rotas necessárias à tabela de reencaminhamento, foi enviado o sinal “ping” de um para o outro para verificar que de facto as máquinas tinham ligação entre si.
+A finalidade desta experiência foi a compreensão da configuração de IP’s em máquinas diferentes, de modo a que estas consigam comunicar entre si. Assim, após a configuração dos IP’s das portas eth0 de dois computadores e a adição das rotas necessárias à tabela de reencaminhamento, foi enviado o sinal “ping” de um computador para o outro, para verificar que, de facto, as máquinas tinham uma ligação entre si.
 
-Para a configuração dos computadores foi utilizado os comandos \textbf{\textit{$<$ifconfig [ip]$>$}} que define o IP da interface para o IP passado como argumento. Após esta configuração executamos um ping de uma máquina para a outra com os IP’s definidos, operação essa que foi executada com sucesso. Foi também possível ver os pedidos ARP, com os pings definidos e a resposta da máquina correspondente com o seu endereço MAC.
+Para a configuração dos computadores foi utilizado o comando \textbf{\textit{$<$ifconfig [ip]$>$}}, que atribui ao IP da interface o IP passado como argumento. Após esta configuração, executamos um ping de uma máquina para a outra com os IP’s definidos, operação essa que foi executada com sucesso. Foi também possível ver os pedidos ARP, com os pings definidos e a resposta da máquina correspondente com o seu endereço MAC.
 
 \begin{figure}[h!]
 \centering
 \includegraphics[scale=0.5]{res/image1.jpg}
+\caption{Exemplo do output de um \emph{ping}.}
 \end{figure}
 
-O ping após obter o endereço MAC através dos pacotes ARP, gera pacotes do protocolo ICMP. Em frames do tipo Ethernet, os bits vinte e um e vinte e dois do frame identificam o protocolo para o qual deve ser enviado o payload.
+O ping, após obter o endereço MAC através dos pacotes ARP, gera pacotes do protocolo ICMP. Em frames do tipo Ethernet, os bits vinte e um e vinte e dois do frame identificam o protocolo para o qual deve ser enviado o payload.
 
 \pagebreak
 
-Please see Figure ~\autoref{fig:teste}
-
-A interface loopback é uma interface de rede virtual que o computador utiliza para comunicar com ele próprio, com o objectivo de realizar testes de diagonóstico ou aceder a servidores na própria máquina, como se fosse um cliente. Assim a vantagem de uma interface loopback é que nos permite ter um endereço IP no router que está sempre activo em vez de ser dependente de uma interface física.
+A interface loopback é uma interface de rede virtual que o computador utiliza para comunicar com ele próprio, com o objectivo de realizar testes de diagnóstico, ou aceder a servidores na própria máquina, como se fosse um cliente. Assim, uma interface loopback, permite a existência de um endereço IP no router, que está sempre activo, em vez de ser dependente de uma interface física.
 
 \subsection{Experiência 2 - Implementar duas LAN's virtuais no switch}
-Nesta experiência foram criadas 2 Vlans no switch, e adicionadas as máqinas 1 e 4 à primeira Vlan e o máquina 2 a segunda Vlan. Com esta configuração a máquina 2 deixaria de ter acesso ás maquinas 1 e 4 uma vez que se encontram em subredes diferentes.
+Nesta experiência foram criadas duas LANs virtuais no switch: a primeira constituída pelas máquinas 1 e 4, e a segunda pela máquina 2. Com esta configuração, a máquina 2 deixaria de ter acesso ás maquinas 1 e 4, uma vez que se encontrariam em sub-redes diferentes.
 
-
-Para a configuração do switch foi necessário entrar na sua consola de configuração e executar o comando \textbf{\textit{$<$vlan [n]$>$}} em que \textbf{\textit{n}} é o número identificador da vlan. Após a configuração das vlan foi necessário adicionar as portas do switch ás respectivas vlans, para criar assim duas subredes individuais. Para tal, usou-se os comandos \textbf{\textit{$<$interface fastethernet 0/[i]$>$}} em que \textbf{\textit{i}} é o identificador da porta do switch, seguido de \textbf{\textit{$<$switchport mode access$>$}} e \textbf{\textit{$<$switchport access vlan [n]$>$}} em que \textit{\textbf{n}} é o identificador da Vlan crianda.
+Para a configuração do switch foi necessário entrar na sua consola de configuração e executar o comando \textbf{\textit{$<$vlan [n]$>$}}, onde \textbf{\textit{n}} é o número identificador da VLAN. Após a configuração das VLANs foi necessário adicionar as portas do switch às respectivas VLANs, para criar duas sub-redes individuais. Para isso usaram-se os comandos \textbf{\textit{$<$interface fastethernet 0/[i]$>$}}, onde \textbf{\textit{i}} é o identificador da porta do switch, seguido de \textbf{\textit{$<$switchport mode access$>$}} e \textbf{\textit{$<$switchport access VLAN [n]$>$}} onde \textit{\textbf{n}} é o identificador da VLAN criada.
 
 \begin{figure}[h!]
 \centering
 \includegraphics[scale=0.3]{res/image3.jpg}
+\caption{Output do briefing da VLAN.}
 \end{figure}
 
-Após estas configurações foi executado um ping para a máquina 2, o que falhou como era esperado, uma vez que se encontra numa sub rede diferente que não era acessível nem pela máquina 1 nem pela máquina 4.
+Após estas configurações foi executado um ping para a máquina 2 que, tal como esperado, falhou, uma vez que se encontrava numa sub-rede diferente, inacessível tanto pela máquina 1, como pela máquina 4.
 
 \subsection{Experiência 3 - Configurar um router em Linux}
-O objectivo desta experiência era configurar a máquina 4 como router entre as duas sub redes criadas na experiência dois.
-
-Para realizar esta tarefa foi necessário ligar a interface ethernet 1 da máquina 4 e configura-la com um IP dentro da mesma gama que a máquina 2 e adicionar esta interface à sub rede da máquina 2.
-
-Após esta configuração adicionou-se uma rota à máquina 1 utilizando o comando \textbf{\textit{$<$route add –net  172.16.y1.0/24 gw 172.16.y0.254$>$}}, o primeiro endereço identifica a gama de endereços para a qual se quer adicionar a rota, e o segundo endereço identifica o IP para o qual reencaminhar o pacote, neste caso o IP da máquina 4. Após isto repetiu-se o mesmo procedimento para a máquina 2, mas utilizando os seguintes endereços \textbf{\textit{$<$route add –net 172.16.y0.0/24 gw 172.16.y1.253$>$}}, mais uma vez o IP 172.16.y1.253 é o IP da máquina 4 nesta sub rede.
-
-Depois destas configurações foi possível pingar a máquina 2 a partir da máquina 1, o pedido para o IP da máquina 2 (172.16.y1.1) é reencaminhado para a máquina 4 (172.16.y0.254), como a máquina 4 está ligada à sub rede de ambas as máquinas, consegue aceder a máquina 2 (172.16.y1.1) através da sua interface eth1 que está nessa sub rede e assim reencaminha o pacote para a máquina 2. Na resposta o processo é idêntico, sendo o pacote reencaminhado da máquina 2, para a máquina 1.
-
+O objectivo desta experiência era configurar a máquina 4 como router entre as duas sub-redes criadas na experiência dois.\\
+Para realizar esta tarefa, foi necessário ligar a interface ethernet 1 da máquina 4 e configurá-la com um IP dentro da mesma gama que a máquina 2, e adicionar esta interface à sub-rede da máquina 2.\\
+Após esta configuração, adicionou-se uma rota à máquina 1 utilizando o comando \textbf{\textit{$<$route add –net  172.16.y1.0/24 gw 172.16.y0.254$>$}}. O primeiro endereço identifica a gama de endereços para a qual se quer adicionar a rota; o segundo endereço identifica o IP para o qual se deve reencaminhar o pacote (neste caso o IP da máquina 4). Posteriormente, repetiu-se o mesmo procedimento para a máquina 2, mas utilizando os seguintes endereços \textbf{\textit{$<$route add –net 172.16.y0.0/24 gw 172.16.y1.253$>$}}. Novamente, o IP 172.16.y1.253, é o IP da máquina 4 nesta sub-rede.\\
+Finalmente, foi possível \emph{pingar} a máquina 2 a partir da máquina 1. O pedido para o IP da máquina 2 - 172.16.y1.1 -, é reencaminhado para a máquina 4 - 172.16.y0.254; como a máquina 4 está ligada à sub-rede de ambas as máquinas, consegue aceder à máquina 2 - 172.16.y1.1 -, através da sua interface eth1, que está nessa sub-rede, e assim reencaminha o pacote para a máquina 2. Na resposta, o processo é idêntico, sendo o pacote reencaminhado da máquina 2, para a máquina 1.
 
 
 \subsection{Experiência 4 - Configurar um router comercial e implementar o NAT}
-Nesta experiência pretendia-se que fosse configurado um router comercial com nat devidamente implementado. A implementação do nat (Network Adress Translation), teve como objectivo dar a possibilidade dos computadores da rede criada poderem comunicarem com redes externas. Por se tratar de uma rede privada, os ip’s nunca seriam reconhecidos fora da rede. Por isso criou-se uma técnica que permite rescrever os IP’s de origem  de uma rede interna, para que possam aceder a uma rede externa. Este procedimento gera um número de 16 bits, utilizando esse valor numa hash table e escrevendo-o no campo da porta de origem. Na resposta o processo é revertido e o router sabe para que computador da rede interna deve enviar a resposta.
-
-Para configurar o router foi necessário inicialmente configurar a interface interna no processo de nat. Para isso, entrou-se na consola de configuração da interface fastethernet 0/0 do router, com o comando \textbf{\textit{$<$interface fastethernet 0/0$>$}}, além disso teve de ser especificado qual o IP para essa interface, introduzindo o comando\textbf{ \textit{$<$ ip address [ip] [mask] $>$}} que neste caso, o \textbf{\textit{ip}} correspondeu ao 172.16.21.254 e o \textbf{\textit{mask}} a 255.255.255.0.  Após isto foi configurada a interface externa, atribuindo um IP à interface 1, que estava ligada ao router da sala. Para isso introduziu-se os seguintes comandos : \textbf{\textit{$<$interface fastethernet 0/1$>$}}, \textbf{\textit{$<$ip adress 172.16.1.29 255.255.255.0$>$}}. Para ambos os casos foi necessário introduzir o comando \textbf{\textit{$<$no shutdown$>$}}, para que estas configurações se mantivessem caso o router fosse desligado. De seguida, para que fosse garantido a gama de endereços introduziu-se os comandos \textbf{\textit{$<$ip nat pool ovrld 172.16.1.29 172.16.1.29 prefix 24$>$}} e \textbf{\textit{$<$ip nat inside source list 1 pool ovrld overload$>$}}. Posteriormente foi criada uma lista de acessos e permissoes de pacotes, para cada uma das sub redes, com o comando \textbf{\textit{$<$acesslist 1 permit ip [máximo]$>$}} neste caso o IP foi 172.16.20.0 e 172.16.21.0 que poderia ir até 172.16.2X.255, colocando 0.0.0.255 no campo \textbf{\textit{máximo}}.
-Finalmente foram definidas as rotas internas e externas, aplicando \textbf{\textit{$<$ip route 0.0.0.0
+Nesta experiência pretendia-se que fosse configurado um router comercial com NAT devidamente implementado. A implementação do NAT (Network Adress Translation) teve como objectivo possibilitar a comunicação entre os computadores da rede criada com redes externas. Por se tratar de uma rede privada, os ip’s nunca seriam reconhecidos fora da rede. Por isso, criou-se uma técnica que permite reescrever os IP’s de origem  de uma rede interna, para que possam aceder a uma rede externa. Este procedimento gera um número de 16 bits, utilizando esse valor numa hash table, e escrevendo-o no campo da porta de origem. Na resposta, o processo é revertido, e o router sabe para qual computador da rede interna deve enviar a resposta.\\
+Para configurar o router, foi necessário configurar a interface interna no processo de NAT. Para isso, entrou-se na consola de configuração da interface fastethernet 0/0 do router, com o comando \textbf{\textit{$<$interface fastethernet 0/0$>$}}. Em adição, teve de ser especificado qual o IP para essa interface, introduzindo o comando\textbf{ \textit{$<$ ip address [ip] [mask] $>$}}, onde, neste caso, o \textbf{\textit{ip}} correspondeu ao 172.16.21.254, e a \textbf{\textit{mask}} a 255.255.255.0.\\
+Posteriormente, foi configurada a interface externa, atribuindo um IP à interface 1, que estava ligada ao router da sala. Para isso, introduziram-se os seguintes comandos: \textbf{\textit{$<$interface fastethernet 0/1$>$}}, \textbf{\textit{$<$ip adress 172.16.1.29 255.255.255.0$>$}}. Para ambos os casos foi necessário introduzir o comando \textbf{\textit{$<$no shutdown$>$}}, para que estas configurações se mantivessem caso o router fosse desligado.\\
+De seguida, para que fosse garantida a gama de endereços, introduziram-se os comandos: \textbf{\textit{$<$ip nat pool ovrld 172.16.1.29 172.16.1.29 prefix 24$>$}} e \textbf{\textit{$<$ip nat inside source list 1 pool ovrld overload$>$}}.\\
+Posteriormente, foi criada uma lista de acessos e permissões de pacotes, para cada uma das sub-redes, com o comando \textbf{\textit{$<$acesslist 1 permit ip [máximo]$>$}}. Neste caso, o IP utilizado foi 172.16.20.0 e 172.16.21.0, que poderia ir até 172.16.2X.255, colocando 0.0.0.255 no campo \textbf{\textit{máximo}}.\\
+Finalmente, foram definidas as rotas internas e externas, aplicando \textbf{\textit{$<$ip route 0.0.0.0
 0.0.0.0 172.16.1.254$>$}} e \textbf{\textit{$<$ip route 172.16.20.0 255.255.255.0 172.16.21.253$>$}}, este comando cria uma rota, quando o IP de destino for 172.16.20.0-255 deve redireccionar os pacotes para o IP 172.16.21.253.
 Para testar, foi executado na máquina 1 um ping ao router da sala e verificou-se que os pacotes enviados para a máquina 1, passavam pela máquina 2, onde eram reencaminhados para o router no IP 172.16.21.254.
 
 \subsection{Experiência 5 - DNS}
-O objectivo desta experiência era conseguir aceder a redes externas, conseguindo desta forma aceder à Internet através da rede interna criada, para isto foi necessário configurar o DNS. 
+O objectivo desta experiência era conseguir aceder a redes externas, conseguindo desta forma aceder à Internet, através da rede interna criada. Para isto, foi necessário configurar o DNS. 
 
-Esta configuração passa por, em todos os hosts da rede criada aceder e editar o ficheiro resolv.conf. Este ficheiro é lido cada vez que são invocadas rotinas que providenciam acesso à Internet. Neste caso o ficheiro foi editado colocando \textbf{\textit{“nameserver 172.16.1.1”}}, que se trata do endereço de IP do servidor a qual deve ser acedido.	
+Esta configuração passa por, em todos os hosts da rede criada, aceder e editar o ficheiro resolv.conf. Este ficheiro é lido cada vez que são invocadas rotinas que fornecem acesso à Internet. Neste caso, o ficheiro foi editado colocando \textbf{\textit{“nameserver 172.16.1.1”}}, que se trata do endereço IP do servidor que deve ser acedido.	
 
 \begin{figure}[h!]
 \centering
 \includegraphics[scale=0.5]{res/image4.jpg}
 \end{figure}
 
-Para testar esta experiência, foi feito o teste de ping usando o “www.google.com”, nos logs, consequentemente verificou-se que o DNS pergunta a informação contida num dado domain name, onde este responde com o tempo de vida e o tamanho do pacote de dados.\linebreak
+Para testar esta experiência, foi feito o teste de ping usando \emph{www.google.com}.\\
+Nos logs, consequentemente, verificou-se que o DNS pergunta a informação contida num dado domain name, e este responde com o tempo de vida e o tamanho do pacote de dados.\linebreak
 Exemplo:
 
 Query-$>$ www.google.com: Type A, class IN.
@@ -249,17 +224,17 @@ Answer-$>$ Name: www.google.com, Type: A, Class: IN, Time to live: 39.
 seconds, Data Length: 4, Addr: 173.194.41.206
 
 \subsection{Experiência 6 - Ligações TCP}
-Por fim, na experiência 6, compilou-se e executou-se a aplicação desenvolvida e descrita na primeira parte do relatório.
-	Para testar a aplicação, foi usado um servidor ftp e efectuado um download de um ficheiro. O download efectuou-se correctamente, o que demonstrou que a rede estava bem configurada, não trazendo qualquer problema no acesso por protocolo ftp, assim como à utilização de um servidor exterior à rede.
+Por fim, na experiência 6, compilou-se e executou-se a aplicação desenvolvida e descrita na primeira parte do relatório.\\
+Para testar a aplicação, foi usado um servidor ftp e efectuado o download de um ficheiro. O download efectuou-se correctamente, o que demonstrou que a rede estava bem configurada, não trazendo qualquer problema no acesso por protocolo ftp, assim como à utilização de um servidor exterior à rede.
 
-	TCP utiliza \textit{Selective Repeat ARQ} que é semelhante ao \textit{GO-BACK-N ARQ} com a diferença que o receptor não deixa de processar os frames recebidos quando detecta um erro. Quando existe a detecção da falha de um frame, o receptor continua um \textit{acknowledgement} com o número da frame que falhou. O receptor continua a receber e a processar as frames seguintes, enviando sempre no \textit{ack} o número da frame que falhou primeiro. No final do envio, o emissor verifica os \textit{ack} e reenvia os frame perdidos.
+TCP utiliza \textit{Selective Repeat ARQ}, que é semelhante ao \textit{GO-BACK-N ARQ}, com a diferença que o receptor não deixa de processar os frames recebidos quando detecta um erro. Quando falha de um frame é detectada, o receptor continua um \textit{acknowledgement} com o número da frame que falhou. O receptor continua a receber e a processar as frames seguintes, enviando sempre, no \textit{ack}, o número da frame que falhou primeiro. No final do envio, o emissor verifica os \textit{ack} e reenvia os frame perdidos.
 
 \section{Conclusões}
-Após a realização deste trabalho concluímos com sucesso os principais objectivos do projecto, configurar uma rede e eleborar uma aplicação de download que fosse capaz de executar utilizando a rede criada. 
+Após a realização deste trabalho, concluímos com sucesso os principais objectivos do projecto: configurar uma rede, e elaborar uma aplicação de download que fosse capaz de executar utilizando a rede criada.
 
-Desta forma, adquirimos competências e conhecimentos importantes de como configurar uma rede de comunicaçãoe além disso, ficamos com um conhecimento mais alargado sobre diferentes tipos de protocolos utilizados para a comunicação e troca de informação numa rede de computadores.
+Desta forma, adquirimos competências e conhecimentos importantes de como configurar uma rede de comunicação. Além disso, ficámos com um conhecimento mais alargado sobre diferentes tipos de protocolos utilizados para a comunicação, e troca de informação numa rede de computadores.
  
-Em suma, podemos afirmar que os objetivos a que nos propusemos na elaboração deste trabalho foram atingidos e que sem dúvida a elaboração deste projeto ajudou a assimilar e fortalecer alguns conhecimentos de redes de computadores e de protocolos da ligação utilizados.
+Em suma, podemos afirmar que os objectivos a que nos propusemos na elaboração deste trabalho foram atingidos, e que, sem dúvida, a elaboração deste projecto ajudou a assimilar e fortalecer alguns conhecimentos de redes de computadores, e de protocolos da ligação utilizados.
 
 \clearpage
 \addcontentsline{toc}{section}{Referências}
@@ -267,11 +242,9 @@ Em suma, podemos afirmar que os objetivos a que nos propusemos na elaboração d
 \bibliographystyle{plain}
 \bibliography{myrefs}
 
-
 \newpage
 \appendix
 \section{Anexos}
-
 \subsection{Imagens relativas a secções do relatório}
 
 \begin{figure}[h!]

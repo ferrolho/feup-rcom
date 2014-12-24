@@ -186,24 +186,27 @@ Finalmente, foi possível \emph{pingar} a máquina 2 a partir da máquina 1. O p
 
 
 \subsection{Experiência 4 - Configurar um router comercial e implementar o NAT}
-Nesta experiência pretendia-se que fosse configurado um router comercial com nat devidamente implementado. A implementação do nat (Network Adress Translation), teve como objectivo dar a possibilidade dos computadores da rede criada poderem comunicarem com redes externas. Por se tratar de uma rede privada, os ip’s nunca seriam reconhecidos fora da rede. Por isso criou-se uma técnica que permite rescrever os IP’s de origem  de uma rede interna, para que possam aceder a uma rede externa. Este procedimento gera um número de 16 bits, utilizando esse valor numa hash table e escrevendo-o no campo da porta de origem. Na resposta o processo é revertido e o router sabe para que computador da rede interna deve enviar a resposta.
-
-Para configurar o router foi necessário inicialmente configurar a interface interna no processo de nat. Para isso, entrou-se na consola de configuração da interface fastethernet 0/0 do router, com o comando \textbf{\textit{$<$interface fastethernet 0/0$>$}}, além disso teve de ser especificado qual o IP para essa interface, introduzindo o comando\textbf{ \textit{$<$ ip address [ip] [mask] $>$}} que neste caso, o \textbf{\textit{ip}} correspondeu ao 172.16.21.254 e o \textbf{\textit{mask}} a 255.255.255.0.  Após isto foi configurada a interface externa, atribuindo um IP à interface 1, que estava ligada ao router da sala. Para isso introduziu-se os seguintes comandos : \textbf{\textit{$<$interface fastethernet 0/1$>$}}, \textbf{\textit{$<$ip adress 172.16.1.29 255.255.255.0$>$}}. Para ambos os casos foi necessário introduzir o comando \textbf{\textit{$<$no shutdown$>$}}, para que estas configurações se mantivessem caso o router fosse desligado. De seguida, para que fosse garantido a gama de endereços introduziu-se os comandos \textbf{\textit{$<$ip nat pool ovrld 172.16.1.29 172.16.1.29 prefix 24$>$}} e \textbf{\textit{$<$ip nat inside source list 1 pool ovrld overload$>$}}. Posteriormente foi criada uma lista de acessos e permissoes de pacotes, para cada uma das sub-redes, com o comando \textbf{\textit{$<$acesslist 1 permit ip [máximo]$>$}} neste caso o IP foi 172.16.20.0 e 172.16.21.0 que poderia ir até 172.16.2X.255, colocando 0.0.0.255 no campo \textbf{\textit{máximo}}.
-Finalmente foram definidas as rotas internas e externas, aplicando \textbf{\textit{$<$ip route 0.0.0.0
+Nesta experiência pretendia-se que fosse configurado um router comercial com NAT devidamente implementado. A implementação do NAT (Network Adress Translation) teve como objectivo possibilitar a comunicação entre os computadores da rede criada com redes externas. Por se tratar de uma rede privada, os ip’s nunca seriam reconhecidos fora da rede. Por isso, criou-se uma técnica que permite reescrever os IP’s de origem  de uma rede interna, para que possam aceder a uma rede externa. Este procedimento gera um número de 16 bits, utilizando esse valor numa hash table, e escrevendo-o no campo da porta de origem. Na resposta, o processo é revertido, e o router sabe para qual computador da rede interna deve enviar a resposta.\\
+Para configurar o router, foi necessário configurar a interface interna no processo de NAT. Para isso, entrou-se na consola de configuração da interface fastethernet 0/0 do router, com o comando \textbf{\textit{$<$interface fastethernet 0/0$>$}}. Em adição, teve de ser especificado qual o IP para essa interface, introduzindo o comando\textbf{ \textit{$<$ ip address [ip] [mask] $>$}}, onde, neste caso, o \textbf{\textit{ip}} correspondeu ao 172.16.21.254, e a \textbf{\textit{mask}} a 255.255.255.0.\\
+Posteriormente, foi configurada a interface externa, atribuindo um IP à interface 1, que estava ligada ao router da sala. Para isso, introduziram-se os seguintes comandos: \textbf{\textit{$<$interface fastethernet 0/1$>$}}, \textbf{\textit{$<$ip adress 172.16.1.29 255.255.255.0$>$}}. Para ambos os casos foi necessário introduzir o comando \textbf{\textit{$<$no shutdown$>$}}, para que estas configurações se mantivessem caso o router fosse desligado.\\
+De seguida, para que fosse garantida a gama de endereços, introduziram-se os comandos: \textbf{\textit{$<$ip nat pool ovrld 172.16.1.29 172.16.1.29 prefix 24$>$}} e \textbf{\textit{$<$ip nat inside source list 1 pool ovrld overload$>$}}.\\
+Posteriormente, foi criada uma lista de acessos e permissões de pacotes, para cada uma das sub-redes, com o comando \textbf{\textit{$<$acesslist 1 permit ip [máximo]$>$}}. Neste caso, o IP utilizado foi 172.16.20.0 e 172.16.21.0, que poderia ir até 172.16.2X.255, colocando 0.0.0.255 no campo \textbf{\textit{máximo}}.\\
+Finalmente, foram definidas as rotas internas e externas, aplicando \textbf{\textit{$<$ip route 0.0.0.0
 0.0.0.0 172.16.1.254$>$}} e \textbf{\textit{$<$ip route 172.16.20.0 255.255.255.0 172.16.21.253$>$}}, este comando cria uma rota, quando o IP de destino for 172.16.20.0-255 deve redireccionar os pacotes para o IP 172.16.21.253.
 Para testar, foi executado na máquina 1 um ping ao router da sala e verificou-se que os pacotes enviados para a máquina 1, passavam pela máquina 2, onde eram reencaminhados para o router no IP 172.16.21.254.
 
 \subsection{Experiência 5 - DNS}
-O objectivo desta experiência era conseguir aceder a redes externas, conseguindo desta forma aceder à Internet através da rede interna criada, para isto foi necessário configurar o DNS. 
+O objectivo desta experiência era conseguir aceder a redes externas, conseguindo desta forma aceder à Internet, através da rede interna criada. Para isto, foi necessário configurar o DNS. 
 
-Esta configuração passa por, em todos os hosts da rede criada aceder e editar o ficheiro resolv.conf. Este ficheiro é lido cada vez que são invocadas rotinas que providenciam acesso à Internet. Neste caso o ficheiro foi editado colocando \textbf{\textit{“nameserver 172.16.1.1”}}, que se trata do endereço de IP do servidor a qual deve ser acedido.	
+Esta configuração passa por, em todos os hosts da rede criada, aceder e editar o ficheiro resolv.conf. Este ficheiro é lido cada vez que são invocadas rotinas que fornecem acesso à Internet. Neste caso, o ficheiro foi editado colocando \textbf{\textit{“nameserver 172.16.1.1”}}, que se trata do endereço IP do servidor que deve ser acedido.	
 
 \begin{figure}[h!]
 \centering
 \includegraphics[scale=0.5]{res/image4.jpg}
 \end{figure}
 
-Para testar esta experiência, foi feito o teste de ping usando o “www.google.com”, nos logs, consequentemente verificou-se que o DNS pergunta a informação contida num dado domain name, onde este responde com o tempo de vida e o tamanho do pacote de dados.\linebreak
+Para testar esta experiência, foi feito o teste de ping usando \emph{www.google.com}.\\
+Nos logs, consequentemente, verificou-se que o DNS pergunta a informação contida num dado domain name, e este responde com o tempo de vida e o tamanho do pacote de dados.\linebreak
 Exemplo:
 
 Query-$>$ www.google.com: Type A, class IN.
@@ -213,24 +216,23 @@ Answer-$>$ Name: www.google.com, Type: A, Class: IN, Time to live: 39.
 seconds, Data Length: 4, Addr: 173.194.41.206
 
 \subsection{Experiência 6 - Ligações TCP}
-Por fim, na experiência 6, compilou-se e executou-se a aplicação desenvolvida e descrita na primeira parte do relatório.
-	Para testar a aplicação, foi usado um servidor ftp e efectuado um download de um ficheiro. O download efectuou-se correctamente, o que demonstrou que a rede estava bem configurada, não trazendo qualquer problema no acesso por protocolo ftp, assim como à utilização de um servidor exterior à rede.
+Por fim, na experiência 6, compilou-se e executou-se a aplicação desenvolvida e descrita na primeira parte do relatório.\\
+Para testar a aplicação, foi usado um servidor ftp e efectuado o download de um ficheiro. O download efectuou-se correctamente, o que demonstrou que a rede estava bem configurada, não trazendo qualquer problema no acesso por protocolo ftp, assim como à utilização de um servidor exterior à rede.
 
-	TCP utiliza \textit{Selective Repeat ARQ} que é semelhante ao \textit{GO-BACK-N ARQ} com a diferença que o receptor não deixa de processar os frames recebidos quando detecta um erro. Quando existe a detecção da falha de um frame, o receptor continua um \textit{acknowledgement} com o número da frame que falhou. O receptor continua a receber e a processar as frames seguintes, enviando sempre no \textit{ack} o número da frame que falhou primeiro. No final do envio, o emissor verifica os \textit{ack} e reenvia os frame perdidos.
+TCP utiliza \textit{Selective Repeat ARQ}, que é semelhante ao \textit{GO-BACK-N ARQ}, com a diferença que o receptor não deixa de processar os frames recebidos quando detecta um erro. Quando falha de um frame é detectada, o receptor continua um \textit{acknowledgement} com o número da frame que falhou. O receptor continua a receber e a processar as frames seguintes, enviando sempre, no \textit{ack}, o número da frame que falhou primeiro. No final do envio, o emissor verifica os \textit{ack} e reenvia os frame perdidos.
 
 \section{Conclusões}
-Após a realização deste trabalho concluímos com sucesso os principais objectivos do projecto, configurar uma rede e eleborar uma aplicação de download que fosse capaz de executar utilizando a rede criada. 
+Após a realização deste trabalho, concluímos com sucesso os principais objectivos do projecto: configurar uma rede, e elaborar uma aplicação de download que fosse capaz de executar utilizando a rede criada.
 
-Desta forma, adquirimos competências e conhecimentos importantes de como configurar uma rede de comunicaçãoe além disso, ficamos com um conhecimento mais alargado sobre diferentes tipos de protocolos utilizados para a comunicação e troca de informação numa rede de computadores.
+Desta forma, adquirimos competências e conhecimentos importantes de como configurar uma rede de comunicação. Além disso, ficámos com um conhecimento mais alargado sobre diferentes tipos de protocolos utilizados para a comunicação, e troca de informação numa rede de computadores.
  
-Em suma, podemos afirmar que os objetivos a que nos propusemos na elaboração deste trabalho foram atingidos e que sem dúvida a elaboração deste projeto ajudou a assimilar e fortalecer alguns conhecimentos de redes de computadores e de protocolos da ligação utilizados.
+Em suma, podemos afirmar que os objectivos a que nos propusemos na elaboração deste trabalho foram atingidos, e que, sem dúvida, a elaboração deste projecto ajudou a assimilar e fortalecer alguns conhecimentos de redes de computadores, e de protocolos da ligação utilizados.
 
 \clearpage
 \addcontentsline{toc}{section}{Referências}
 \renewcommand\refname{Referências}
 \bibliographystyle{plain}
 \bibliography{myrefs}
-
 
 \newpage
 \appendix

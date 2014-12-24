@@ -39,3 +39,4 @@ Default
 *.log
 *.aux
 *.synctex.gz
+*.toc

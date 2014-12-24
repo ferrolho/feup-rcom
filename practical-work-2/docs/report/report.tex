@@ -254,17 +254,35 @@ Para testar a aplicação, foi usado um servidor ftp e efectuado o download de u
 TCP utiliza \textit{Selective Repeat ARQ}, que é semelhante ao \textit{GO-BACK-N ARQ}, com a diferença que o receptor não deixa de processar os frames recebidos quando detecta um erro. Quando falha de um frame é detectada, o receptor continua um \textit{acknowledgement} com o número da frame que falhou. O receptor continua a receber e a processar as frames seguintes, enviando sempre, no \textit{ack}, o número da frame que falhou primeiro. No final do envio, o emissor verifica os \textit{ack} e reenvia os frame perdidos.
 
 \section{Conclusões}
-Após a realização deste trabalho, concluímos com sucesso os principais objectivos do projecto: configurar uma rede, e elaborar uma aplicação de download que fosse capaz de executar utilizando a rede criada.
+Após a conclusão do segundo projecto de Redes e Computadores, o grupo interiorizou não todos mas os conceitos necessários para uma estável e coerente implementação do que era pedido no guião.
 
-Desta forma, adquirimos competências e conhecimentos importantes de como configurar uma rede de comunicação. Além disso, ficámos com um conhecimento mais alargado sobre diferentes tipos de protocolos utilizados para a comunicação, e troca de informação numa rede de computadores.
- 
-Em suma, podemos afirmar que os objectivos a que nos propusemos na elaboração deste trabalho foram atingidos, e que, sem dúvida, a elaboração deste projecto ajudou a assimilar e fortalecer alguns conhecimentos de redes de computadores, e de protocolos da ligação utilizados.
+\hfill
+
+A configuração de rede foi concluída com sucesso permitindo a todos os elementos do grupo uma possível implementação ou, pelo menos, ter uma noção de como tudo funciona e assim aplicar esta prática a nível profissional.
+
+A aplicação de download embora fosse mais fácil de implementar, implicava um prévio estudo de alguns protocolos como os que são descritos nos RFC959 e RFC1738 sobre FTP e sintax do URL, respectivamente.
+
+Todos os objectivos delineados pelo grupo foram atingidos com sucesso. É importante obter conhecimentos acerca de protocolos de ligação pois são bastante utilizados no quotidiano, fornecendo ao grupo uma perspectiva do que é trabalhar no ramo e do que é possível produzir com estas ferramentas.
+
+\hfill
+
+O relatório é sinónimo do término do projecto estando o grupo orgulhoso do que conseguiu produzir.
 
 \clearpage
 \addcontentsline{toc}{section}{Referências}
 \renewcommand\refname{Referências}
 \bibliographystyle{plain}
-\bibliography{myrefs}
+\begin{thebibliography}{5}
+  \bibitem{notes} Manuel Ricardo {\em Lab 2 - Computer Networks.}  2014 \href{http://moodle.up.pt/pluginfile.php/120587/mod_resource/content/3/lab2.pdf}{link}.
+
+  \bibitem{notes} J. Postel, J. Reinolds {\em File Transfer Protocol} 1985 \href{https://www.ietf.org/rfc/rfc959.txt}{link}.
+
+  \bibitem{notes} T. Berners-Lee {\em Uniform Resource Locators} 1994 \href{https://www.ietf.org/rfc/rfc1738.txt}{link}
+
+  \bibitem{notes} Brian Hall {\em Beej's Guide to Network Programming - Using Internet Sockets} 2012 \href{http://www.beej.us/guide/bgnet/output/html/multipage/}{link}
+
+  \bibitem{notes} {\em O Protocolo FTP} 2014 \href{  http://pt.kioskea.net/contents/265-o-protocolo-ftp-file-transfer-protocol}{link}
+\end{thebibliography}
 
 \newpage
 \appendix
@@ -301,6 +319,8 @@ Em suma, podemos afirmar que os objectivos a que nos propusemos na elaboração 
 \label{fig:normal}
 \end{figure}
 
+\pagebreak
+
 \begin{figure}[h!]
 \centering
 \caption{Modo normal - antes}
@@ -313,14 +333,6 @@ Em suma, podemos afirmar que os objectivos a que nos propusemos na elaboração 
 \caption{Modo normal - depois}
 \includegraphics[scale=0.35]{res/depois-modonormal.png}
 \label{fig:depoisnormal}
-\end{figure}
-
-\pagebreak
-
-\begin{figure}[h!]
-\caption{Experiência 1 - WireShark}
-\includegraphics[scale=0.25]{res/image2.png}
-\label{fig:teste}
 \end{figure}
 
 \subsection{Código da aplicação}
@@ -366,10 +378,38 @@ Em suma, podemos afirmar que os objectivos a que nos propusemos na elaboração 
 {\small\lstinputlisting[language=C]{src/FTP.c}}
 \end{changemargin}
 
+\pagebreak
+
 \subsection{Comandos de configuração}
-Comandos de configuração.
+{\underline{\textit{\textbf{Experiência 1 - Configurar um IP de rede}}}}
+\obeylines
+\input{exp/exp1.txt}
+
+\hfill
+
+{\underline{\textit{\textbf{Experiência 2 - Implementar duas VLANs virtuais no switch}}}}
+\obeylines
+\input{exp/exp2.txt}
+
+\hfill
+
+{\underline{\textit{\textbf{Experiência 3 - Configurar um router em Linux}}}}
+\obeylines
+\input{exp/exp3.txt}
+
+\hfill
+
+{\underline{\textit{\textbf{Experiência 4 - Configurar um router comercial e implementar o NAT}}}}
+\obeylines
+\input{exp/exp4.txt}
+
+\pagebreak
 
 \subsection{Logs gravados}
-Logs gravados.
+\begin{figure}[h!]
+\caption{Experiência 1 - WireShark}
+\includegraphics[scale=0.25]{res/image2.png}
+\label{fig:teste}
+\end{figure}
 
 \end{document}

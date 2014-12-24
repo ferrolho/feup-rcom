@@ -1,0 +1,42 @@
+--Criação de ambas as VLAN's
+
+configure terminal
+vlan 20
+end
+
+configure terminal
+vlan 21
+end
+
+--Ports da VLAN 20
+configure terminal
+interface fastethernet 0/1
+switchport mode access
+switchport access vlan 20
+end
+
+configure terminal
+interface fastethernet 0/3
+switchport mode access
+switchport access vlan 20
+end
+
+--Ports da VLAN 21
+configure terminal
+interface fastethernet 0/2
+switchport mode access
+switchport access vlan 21
+end
+
+
+configure terminal
+interface fastethernet 0/4
+switchport mode access
+switchport access vlan 21
+end
+
+configure terminal
+interface fastethernet 0/5
+switchport mode access
+switchport access vlan 21
+end

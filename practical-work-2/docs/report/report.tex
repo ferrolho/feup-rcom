@@ -6,6 +6,7 @@
 \usepackage{verbatim}
 \usepackage{hyperref}
 \hypersetup{colorlinks=true, linkcolor=black}
+\usepackage{listings}
 
 
 \begin{document}
@@ -170,6 +171,13 @@ O funcionamento do programa é igual no modo normal e no modo anónimo, sendo a 
 
 O tempo registado para a transferência deste ficheiro foi de 15 segundos, com um tamanho de 8.5 Mb. Isto serve para comprovar que o tempo nesta experiência não pode ser tomado como factor proponderante pois a sua resolução não se encontra ao alcance do grupo.
 
+Aqui ficam as imagens relativas a antes e depois da transferência.
+
+-$>$Antes~\autoref{fig:antesnormal}
+
+-$>$Depois~\autoref{fig:depoisnormal}
+
+
 \section{Parte 2 - Configuração da rede e análise}
 \subsection{Experiência 1 - Configurar um IP de rede}
 A finalidade desta experiência foi a compreensão da configuração de IP’s em máquinas diferentes, de modo a que estas consigam comunicar entre si. Assim, após a configuração dos IP’s das portas eth0 de dois computadores e a adição das rotas necessárias à tabela de reencaminhamento, foi enviado o sinal “ping” de um para o outro para verificar que de facto as máquinas tinham ligação entre si.
@@ -297,13 +305,69 @@ Em suma, podemos afirmar que os objetivos a que nos propusemos na elaboração d
 \end{figure}
 
 \begin{figure}[h!]
+\centering
+\caption{Modo normal - antes}
+\includegraphics[scale=0.35]{res/depois-modoanonimo.png}
+\label{fig:antesnormal}
+\end{figure}
+
+\begin{figure}[h!]
+\centering
+\caption{Modo normal - depois}
+\includegraphics[scale=0.35]{res/depois-modonormal.png}
+\label{fig:depoisnormal}
+\end{figure}
+
+\pagebreak
+
+\begin{figure}[h!]
 \caption{Experiência 1 - WireShark}
 \includegraphics[scale=0.25]{res/image2.png}
 \label{fig:teste}
 \end{figure}
 
 \subsection{Código da aplicação}
-Código da aplicação.
+\newenvironment{changemargin}[2]{%
+\begin{list}{}{%
+\setlength{\topsep}{0pt}%
+\setlength{\leftmargin}{#1}%
+\setlength{\rightmargin}{#2}%
+\setlength{\listparindent}{\parindent}%
+\setlength{\itemindent}{\parindent}%
+\setlength{\parsep}{\parskip}%
+}%
+\item[]}{
+\end{list}}
+
+{\underline{\textit{\textbf{Main.c}}}}
+
+\begin{changemargin}{-3cm}{-4cm}
+{\small\lstinputlisting[language=C]{src/Main.c}}
+\end{changemargin}
+
+{\underline{\textit{\textbf{URL.h}}}}
+
+\begin{changemargin}{-3cm}{-4cm}
+{\small\lstinputlisting[language=C]{src/URL.h}}
+\end{changemargin}
+
+{\underline{\textit{\textbf{URL.c}}}}
+
+\begin{changemargin}{-3cm}{-4cm}
+{\small\lstinputlisting[language=C]{src/URL.c}}
+\end{changemargin}
+
+{\underline{\textit{\textbf{FTP.h}}}}
+
+\begin{changemargin}{-3cm}{-4cm}
+\lstinputlisting[language=C]{src/FTP.h}
+\end{changemargin}
+
+{\underline{\textit{\textbf{FTP.c}}}}
+
+\begin{changemargin}{-3cm}{-4cm}
+{\small\lstinputlisting[language=C]{src/FTP.c}}
+\end{changemargin}
 
 \subsection{Comandos de configuração}
 Comandos de configuração.
